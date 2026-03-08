@@ -604,11 +604,19 @@ class InterfaceParametresIDS(QMainWindow):
             item_regle = QTableWidgetItem(regle)
             item_regle.setForeground(QColor("white"))
             self.table_regles.setItem(i, 1, item_regle)
+
+
         
         self.table_regles.resizeColumnsToContents()
         liste_layout.addWidget(self.table_regles)
         group_liste.setLayout(liste_layout)
         left_layout.addWidget(group_liste)
+
+        def add_rule_to_table(rule):
+            row_count = self.table_regles.rowCount()
+            self.table_regles.insertRow(row_count)
+            self.table_regles.setItem(row_count, 0, QTableWidgetItem("✓"))
+            self.table_regles.setItem(row_count, 1, QTableWidgetItem(rule))
         
         # Panneau droit - Gestion des règles
         right_panel = QWidget()

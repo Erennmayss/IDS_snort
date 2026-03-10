@@ -1,6 +1,6 @@
 import psycopg2
 import db_connection
-from data.db_connection import connect_db
+from db_connection import connect_db
 
 
 def fetch_rules_from_db(interface):

@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QRect
 from PyQt6.QtGui import QFont, QColor, QPalette
+from data.queries import fetch_rules_from_db
 
 class InterfaceParametresIDS(QMainWindow):
     def __init__(self):
@@ -26,6 +27,7 @@ class InterfaceParametresIDS(QMainWindow):
         self.setPalette(palette)
         
         self.initUI()
+        self.load_rules()
         
     def initUI(self):
         # Configuration de la fenêtre principale
@@ -680,6 +682,19 @@ class InterfaceParametresIDS(QMainWindow):
         layout.addWidget(splitter)
         return widget
 
+    def load_rules(self):
+
+        rules = fetch_rules_from_db(self)
+
+        self.table_regles.setRowCount(0)
+
+        for sid, rule in rules:
+            row = self.table_regles.rowCount()
+            self.table_regles.insertRow(row)
+
+            self.table_regles.setItem(row, 0, QTableWidgetItem(str(sid)))
+            self.table_regles.setItem(row, 1, QTableWidgetItem(rule))
+
     def add_rule_to_table(self, rule,sid):
         row_count = self.table_regles.rowCount()
         self.table_regles.insertRow(row_count)
@@ -881,16 +896,15 @@ class InterfaceParametresIDS(QMainWindow):
         self.status_label.setText(f"● STATUT: {status}")
         self.status_bar.setText(f"⚡ IDS {status}")
         
-    def ajouter_regle(self):
+    def ajouter_regle(self,rule,sid):
         """Ajoute une nouvelle règle"""
-        nouvelle_regle = self.edit_regle.toPlainText().strip()
+        nouvelle_regle = rule
         if nouvelle_regle:
             row = self.table_regles.rowCount()
             self.table_regles.insertRow(row)
             
-            item_etat = QTableWidgetItem("✓")
+            item_etat = QTableWidgetItem(str(sid))
             item_etat.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            item_etat.setForeground(QColor("#9b59b6"))
             self.table_regles.setItem(row, 0, item_etat)
             
             item_regle = QTableWidgetItem(nouvelle_regle)
@@ -1106,7 +1120,6 @@ class InterfaceParametresIDS(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
-    
     # Style global
     app.setStyleSheet("""
         QMessageBox {

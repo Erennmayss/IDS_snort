@@ -65,3 +65,13 @@ def modifier_regle(first_sid,line):
         (sid, message, protocol, src_ip, src_port, dst_ip, dst_port, action, line, first_sid)
     )
     conn.commit()
+
+def supprimer_regle(sid):
+    cursor.execute(
+        """
+           DELETE FROM regles
+           WHERE sid = %s
+           """,
+        (sid,)
+    )
+    conn.commit()

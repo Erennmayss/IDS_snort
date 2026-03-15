@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QGroupBox, QTableWidget,
 from six import integer_types
 from unicodedata import numeric
 
-from data.rules import afficher_db, ajouter_regle
+from data.rules import afficher_db, ajouter_regle, modifier_regle,supprimer_regle
 
 
 class InterfaceParametresIDS(QMainWindow):
@@ -680,8 +680,8 @@ class InterfaceParametresIDS(QMainWindow):
 
         # Connexions
         self.btn_ajouter.clicked.connect(self.add_rules)
-        self.btn_supprimer.clicked.connect(self.supprimer_regle)
-        #self.btn_modifier.clicked.connect(self.modifier_regle)
+        self.btn_supprimer.clicked.connect(self.delete_rule)
+        self.btn_modifier.clicked.connect(self.update_rule)
         self.table_regles.itemDoubleClicked.connect(self.charger_regle_pour_modification)
 
         return widget
@@ -712,6 +712,36 @@ class InterfaceParametresIDS(QMainWindow):
             self.table_regles.insertRow(row_count)
             self.table_regles.setItem(row_count, 0, QTableWidgetItem(str(r[0])))  # SID ou Etat
             self.table_regles.setItem(row_count, 1, QTableWidgetItem(r[1]))  # Règle
+
+    def charger_regle_pour_modification(self, item):
+        """Charge la règle sélectionnée dans l'éditeur"""
+        row = item.row()
+        self.regle = self.table_regles.item(row, 1).text()
+        self.sid =int( self.table_regles.item(row, 0).text())
+        self.edit_regle.setText(self.regle)
+
+    def update_rule(self):
+        self.regle=self.edit_regle.toPlainText()
+        modifier_regle(self.sid,self.regle)
+        self.table_regles.setRowCount(0)
+        rules = afficher_db()  # fonction qui fait SELECT * FROM regles
+        for r in rules:
+            row_count = self.table_regles.rowCount()
+            self.table_regles.insertRow(row_count)
+            self.table_regles.setItem(row_count, 0, QTableWidgetItem(str(r[0])))  # SID ou Etat
+            self.table_regles.setItem(row_count, 1, QTableWidgetItem(r[1]))  # Règle
+
+    def delete_rule(self):
+        self.regle = self.edit_regle.toPlainText()
+        supprimer_regle(self.sid)
+        self.table_regles.setRowCount(0)
+        rules = afficher_db()  # fonction qui fait SELECT * FROM regles
+        for r in rules:
+            row_count = self.table_regles.rowCount()
+            self.table_regles.insertRow(row_count)
+            self.table_regles.setItem(row_count, 0, QTableWidgetItem(str(r[0])))  # SID ou Etat
+            self.table_regles.setItem(row_count, 1, QTableWidgetItem(r[1]))  # Règle
+
 
     def create_securite_tab(self):
         """Crée l'onglet Sécurité Réseau (sans liste blanche)"""
@@ -903,12 +933,6 @@ class InterfaceParametresIDS(QMainWindow):
         status = "ACTIF" if etat else "INACTIF"
         self.status_label.setText(f"● STATUT: {status}")
         self.status_bar.setText(f"⚡ IDS {status}")
-
-    def charger_regle_pour_modification(self, item):
-        """Charge la règle sélectionnée dans l'éditeur"""
-        row = item.row()
-        regle = self.table_regles.item(row, 1).text()
-        self.edit_regle.setText(regle)
 
     def supprimer_regle(self):
         """Supprime la règle sélectionnée"""

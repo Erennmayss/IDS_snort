@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QGroupBox, QTableWidget,
 from six import integer_types
 from unicodedata import numeric
 
-from data.rules import afficher_db, ajouter_regle, modifier_regle,supprimer_regle
+from data.rules import afficher_db, ajouter_regle, modifier_regle,supprimer_regle,reset_db
 
 
 class InterfaceParametresIDS(QMainWindow):
@@ -1051,60 +1051,39 @@ class InterfaceParametresIDS(QMainWindow):
         self.status_bar.setText("✅ Configuration appliquée")
 
     def reset_configuration(self):
-        """Réinitialise la configuration"""
-        reply = QMessageBox.question(self, "Confirmation",
-                                     "Voulez-vous vraiment réinitialiser toute la configuration?",
-                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-        if reply == QMessageBox.StandardButton.Yes:
-            # Recharger la configuration par défaut
-            self.cb_activer_ids.setChecked(True)
-            self.cb_demarrage_auto.setChecked(True)
-            self.cb_redemarrage_auto.setChecked(True)
-            self.spin_intervalle.setValue(5)
+            """Réinitialise la configuration"""
+            reply = QMessageBox.question(self, "Confirmation",
+                                         "Voulez-vous vraiment réinitialiser toute la configuration?",
+                                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if reply == QMessageBox.StandardButton.Yes:
+                # Recharger la configuration par défaut
+                reset_db()
+                # Règles par défaut (plus nombreuses)
+                self.table_regles.setRowCount(0)
+                '''
+                self.cb_activer_ids.setChecked(True)
+                self.cb_demarrage_auto.setChecked(True)
+                self.cb_redemarrage_auto.setChecked(True)
+                self.spin_intervalle.setValue(5)
 
-            self.spin_max_paquets.setValue(5000)
-            self.spin_volume_max.setValue(100)
-            self.spin_max_connexions.setValue(1000)
-            self.spin_max_tentatives.setValue(5)
-            self.spin_temps_blocage_auth.setValue(10)
-            self.spin_ports_scan.setValue(50)
-            self.spin_temps_scan.setValue(10)
+                self.spin_max_paquets.setValue(5000)
+                self.spin_volume_max.setValue(100)
+                self.spin_max_connexions.setValue(1000)
+                self.spin_max_tentatives.setValue(5)
+                self.spin_temps_blocage_auth.setValue(10)
+                self.spin_ports_scan.setValue(50)
+                self.spin_temps_scan.setValue(10)
 
-            # Règles par défaut (plus nombreuses)
-            self.table_regles.setRowCount(0)
-            regles_defaut = [
-                ("✓", "Alerte si trafic ICMP > 500/sec"),
-                ("✓", "Bloquer port 23 (Telnet)"),
-                ("✓", "Surveiller port 22 (SSH)"),
-                ("✓", "Alerte si SYN > 1000/sec"),
-                ("✓", "Bloquer les paquets fragmentés"),
-                ("✓", "Alerte sur tentative de buffer overflow"),
-                ("✓", "Surveiller les connexions sortantes"),
-                ("✓", "Bloquer les IPs de la blacklist"),
-            ]
-            for etat, regle in regles_defaut:
-                row = self.table_regles.rowCount()
-                self.table_regles.insertRow(row)
+                # Blacklist par défaut
+                self.blacklist.clear()
+                self.blacklist.addItems(["1.2.3.4", "5.6.7.8", "10.0.0.50"])
 
-                item_etat = QTableWidgetItem(etat)
-                item_etat.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                item_etat.setForeground(QColor("#9b59b6"))
-                self.table_regles.setItem(row, 0, item_etat)
+                self.cb_blocage_auto.setChecked(True)
+                self.spin_temps_blocage_auto.setValue(30)
+                self.cb_ip_internes.setChecked(False)
+                self.cb_rejeter_externes.setChecked(True)'''
 
-                item_regle = QTableWidgetItem(regle)
-                item_regle.setForeground(QColor("white"))
-                self.table_regles.setItem(row, 1, item_regle)
-
-            # Blacklist par défaut
-            self.blacklist.clear()
-            self.blacklist.addItems(["1.2.3.4", "5.6.7.8", "10.0.0.50"])
-
-            self.cb_blocage_auto.setChecked(True)
-            self.spin_temps_blocage_auto.setValue(30)
-            self.cb_ip_internes.setChecked(False)
-            self.cb_rejeter_externes.setChecked(True)
-
-            self.status_bar.setText("🔄 Configuration réinitialisée")
+                self.status_bar.setText("🔄 Configuration réinitialisée")
 
     def sauvegarder_configuration(self):
         """Sauvegarde la configuration dans un fichier"""

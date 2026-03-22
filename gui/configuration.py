@@ -1,3 +1,4 @@
+import re
 import sys
 import json
 import os
@@ -567,7 +568,7 @@ class InterfaceParametresIDS(QMainWindow):
         liste_layout = QVBoxLayout()
         self.table_regles = QTableWidget()
         self.table_regles.setColumnCount(2)
-        self.table_regles.setHorizontalHeaderLabels(["Etat", "Règle"])
+        self.table_regles.setHorizontalHeaderLabels(["Sid", "Règle"])
 
         header = self.table_regles.horizontalHeader()
 
@@ -715,21 +716,39 @@ class InterfaceParametresIDS(QMainWindow):
 
     def charger_regle_pour_modification(self, item):
         """Charge la règle sélectionnée dans l'éditeur"""
-        row = item.row()
-        self.regle = self.table_regles.item(row, 1).text()
-        self.sid =int( self.table_regles.item(row, 0).text())
+        self.row = item.row()
+        self.regle = self.table_regles.item(self.row, 1).text()
+        self.sid =int( self.table_regles.item(self.row, 0).text())
         self.edit_regle.setText(self.regle)
 
     def update_rule(self):
-        self.regle=self.edit_regle.toPlainText()
-        modifier_regle(self.sid,self.regle)
+        self.regle = self.edit_regle.toPlainText()
+
+        # Extraire le SID de la règle modifiée
+        sid_match = re.search(r'sid:(\d+)', self.regle)
+        nouveau_sid = sid_match.group(1) if sid_match else None
+
+        # Si le SID a changé, demander confirmation
+        if nouveau_sid and int(nouveau_sid) != self.sid:
+            reply = QMessageBox.question(
+                self,
+                'Changement de SID',
+                f'Le SID passe de {self.sid} à {nouveau_sid}. Voulez-vous continuer ?',
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if reply == QMessageBox.No:
+                return
+
+        modifier_regle(self.sid, self.regle)
+
+        # Rafraîchir l'affichage
         self.table_regles.setRowCount(0)
-        rules = afficher_db()  # fonction qui fait SELECT * FROM regles
+        rules = afficher_db()
         for r in rules:
             row_count = self.table_regles.rowCount()
             self.table_regles.insertRow(row_count)
-            self.table_regles.setItem(row_count, 0, QTableWidgetItem(str(r[0])))  # SID ou Etat
-            self.table_regles.setItem(row_count, 1, QTableWidgetItem(r[1]))  # Règle
+            self.table_regles.setItem(row_count, 0, QTableWidgetItem(str(r[0])))
+            self.table_regles.setItem(row_count, 1, QTableWidgetItem(r[1]))
 
     def delete_rule(self):
         self.regle = self.edit_regle.toPlainText()

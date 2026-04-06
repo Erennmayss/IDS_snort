@@ -130,6 +130,9 @@ class MainWindow(QWidget):
             elif index == 2:
                 from gui.traficreseaux import TrafficAnalyzerInterface
                 widget = TrafficAnalyzerInterface()
+            elif index == 3:  # <--- AJOUT DU MACHINE LEARNING ICI
+                from gui.ML import IDSWindow
+                widget = IDSWindow()
             elif index == 4:
                 from gui.configuration import InterfaceParametresIDS
                 widget = InterfaceParametresIDS()

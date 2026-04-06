@@ -41,18 +41,18 @@ class RapportInterface(QMainWindow):
         self.setGeometry(0, 0, size.width(), size.height())
         self.setFixedSize(size.width(), size.height() - 80)
 
-        # Couleurs pour l'interface
+        # Couleurs unifiées pour l'interface (Palette Slate/Sky)
         self.colors = {
-            'bg_dark': '#0A1929',
-            'bg_medium': '#132F4C',
-            'accent': '#1E4976',
-            'success': '#2ecc71',
-            'warning': '#f39c12',
-            'danger': '#e74c3c',
-            'info': '#3498db',
-            'text': '#E0E0E0',
-            'text_bright': '#FFFFFF',
-            'terminal_green': '#00ff00'
+            'bg_dark': '#0F172A',
+            'bg_medium': '#1E293B',
+            'accent': '#334155',
+            'success': '#10B981',
+            'warning': '#F59E0B',
+            'danger': '#EF4444',
+            'info': '#38BDF8',
+            'text': '#94A3B8',
+            'text_bright': '#F8FAFC',
+            'terminal_green': '#10B981'
         }
 
         # Configuration du style
@@ -168,27 +168,27 @@ class RapportInterface(QMainWindow):
                 background-color: {self.colors['bg_dark']};
             }}
             QLabel {{
-                color: {self.colors['text']};
+                color: {self.colors['text_bright']};
                 font-family: 'Consolas', 'Courier New', monospace;
             }}
             QLabel#title_label {{
                 font-size: 20px;
                 font-weight: bold;
-                color: {self.colors['text_bright']};
+                color: {self.colors['info']};
                 padding: 10px;
-                background-color: {self.colors['accent']};
+                background-color: transparent;
                 border-radius: 5px;
                 letter-spacing: 1px;
             }}
             QGroupBox {{
                 font-size: 14px;
                 font-weight: bold;
-                color: {self.colors['info']};
+                color: {self.colors['text_bright']};
                 border: 2px solid {self.colors['accent']};
                 border-radius: 8px;
                 margin-top: 15px;
                 padding-top: 15px;
-                background-color: rgba(10, 25, 41, 0.95);
+                background-color: rgba(15, 23, 42, 0.95);
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
@@ -199,14 +199,14 @@ class RapportInterface(QMainWindow):
             QComboBox {{
                 background-color: {self.colors['bg_medium']};
                 color: {self.colors['text_bright']};
-                border: 1px solid {self.colors['info']};
+                border: 1px solid {self.colors['accent']};
                 border-radius: 3px;
                 padding: 8px;
                 font-family: 'Consolas', monospace;
                 min-width: 200px;
             }}
             QComboBox:hover {{
-                border: 1px solid {self.colors['success']};
+                border: 1px solid {self.colors['info']};
             }}
             QComboBox::drop-down {{
                 border: none;
@@ -215,7 +215,7 @@ class RapportInterface(QMainWindow):
                 image: none;
                 border-left: 5px solid transparent;
                 border-right: 5px solid transparent;
-                border-top: 5px solid {self.colors['info']};
+                border-top: 5px solid {self.colors['text_bright']};
                 width: 0;
                 height: 0;
             }}
@@ -231,25 +231,30 @@ class RapportInterface(QMainWindow):
             }}
             QPushButton:hover {{
                 background-color: {self.colors['info']};
+                color: {self.colors['bg_dark']};
             }}
             QPushButton#pdf_button {{
                 background-color: {self.colors['danger']};
             }}
             QPushButton#pdf_button:hover {{
-                background-color: #c0392b;
+                background-color: #B91C1C;
+                color: white;
             }}
             QPushButton#refresh_button {{
-                background-color: {self.colors['success']};
+                background-color: {self.colors['info']};
+                color: {self.colors['bg_dark']};
             }}
             QPushButton#refresh_button:hover {{
-                background-color: #27ae60;
+                background-color: #0284C7;
+                color: white;
             }}
             QTableWidget {{
                 background-color: {self.colors['bg_medium']};
-                color: {self.colors['text']};
-                border: 1px solid {self.colors['info']};
+                color: {self.colors['text_bright']};
+                border: 1px solid {self.colors['accent']};
                 gridline-color: {self.colors['accent']};
                 font-family: 'Consolas', monospace;
+                alternate-background-color: {self.colors['bg_dark']};
             }}
             QTableWidget::item {{
                 padding: 8px;
@@ -257,20 +262,21 @@ class RapportInterface(QMainWindow):
             }}
             QTableWidget::item:selected {{
                 background-color: {self.colors['info']};
-                color: white;
+                color: {self.colors['bg_dark']};
             }}
             QHeaderView::section {{
-                background-color: {self.colors['accent']};
+                background-color: {self.colors['bg_dark']};
                 color: {self.colors['text_bright']};
                 padding: 10px;
-                border: 1px solid {self.colors['bg_dark']};
+                border: 1px solid {self.colors['accent']};
                 font-weight: bold;
                 font-size: 13px;
             }}
             QFrame#header_frame {{
-                background-color: {self.colors['accent']};
+                background-color: {self.colors['bg_medium']};
                 border-radius: 5px;
                 padding: 10px;
+                border: 1px solid {self.colors['accent']};
             }}
             QFrame#toolbar_frame {{
                 background-color: {self.colors['bg_medium']};
@@ -420,6 +426,7 @@ class RapportInterface(QMainWindow):
 
         # Tableau des détails
         self.details_table = QTableWidget()
+        self.details_table.setAlternatingRowColors(True)
         self.details_table.setColumnCount(4)
         self.details_table.setHorizontalHeaderLabels(["Date", "Type d'attaque", "Source", "Sévérité"])
 
@@ -476,11 +483,11 @@ class RapportInterface(QMainWindow):
                 # Coloration selon la sévérité
                 severite_item = QTableWidgetItem(detail['severite'])
                 if detail['severite'].lower() == 'haute' or detail['severite'].lower() == 'high':
-                    severite_item.setBackground(QBrush(QColor(231, 76, 60, 100)))
+                    severite_item.setBackground(QBrush(QColor(239, 68, 68, 100))) # Rouge vif
                 elif detail['severite'].lower() == 'moyenne' or detail['severite'].lower() == 'medium':
-                    severite_item.setBackground(QBrush(QColor(243, 156, 18, 100)))
+                    severite_item.setBackground(QBrush(QColor(245, 158, 11, 100))) # Ambre
                 else:
-                    severite_item.setBackground(QBrush(QColor(46, 204, 113, 100)))
+                    severite_item.setBackground(QBrush(QColor(16, 185, 129, 100))) # Vert
 
                 self.details_table.setItem(i, 3, severite_item)
 
@@ -507,11 +514,11 @@ class RapportInterface(QMainWindow):
                 # Coloration selon la sévérité
                 severite_item = QTableWidgetItem(detail['severite'])
                 if detail['severite'].lower() == 'haute' or detail['severite'].lower() == 'high':
-                    severite_item.setBackground(QBrush(QColor(231, 76, 60, 100)))
+                    severite_item.setBackground(QBrush(QColor(239, 68, 68, 100)))
                 elif detail['severite'].lower() == 'moyenne' or detail['severite'].lower() == 'medium':
-                    severite_item.setBackground(QBrush(QColor(243, 156, 18, 100)))
+                    severite_item.setBackground(QBrush(QColor(245, 158, 11, 100)))
                 else:
-                    severite_item.setBackground(QBrush(QColor(46, 204, 113, 100)))
+                    severite_item.setBackground(QBrush(QColor(16, 185, 129, 100)))
 
                 self.details_table.setItem(i, 3, severite_item)
 
@@ -569,7 +576,7 @@ class RapportInterface(QMainWindow):
             'CustomTitle',
             parent=styles['Heading1'],
             fontSize=24,
-            textColor=colors.HexColor('#0A1929'),
+            textColor=colors.HexColor('#0F172A'),
             spaceAfter=20,
             alignment=1,
             fontName='Helvetica-Bold'
@@ -582,7 +589,7 @@ class RapportInterface(QMainWindow):
             'DateStyle',
             parent=styles['Normal'],
             fontSize=9,
-            textColor=colors.HexColor('#1E4976'),
+            textColor=colors.HexColor('#334155'),
             alignment=2,
             fontName='Helvetica'
         )
@@ -595,7 +602,7 @@ class RapportInterface(QMainWindow):
             'SummaryStyle',
             parent=styles['Heading2'],
             fontSize=14,
-            textColor=colors.HexColor('#132F4C'),
+            textColor=colors.HexColor('#1E293B'),
             spaceAfter=8,
             fontName='Helvetica-Bold'
         )
@@ -614,7 +621,7 @@ class RapportInterface(QMainWindow):
 
         stats_table = Table(stats_data, colWidths=[3 * inch, 1.5 * inch])
         stats_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E4976')),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E293B')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
@@ -623,9 +630,9 @@ class RapportInterface(QMainWindow):
             ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
             ('TOPPADDING', (0, 0), (-1, -1), 6),
             ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#F5F5F5')),
-            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#132F4C')),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#FFFFFF'), colors.HexColor('#F0F0F0')])
+            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#F8FAFC')),
+            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#334155')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#FFFFFF'), colors.HexColor('#F1F5F9')])
         ]))
         story.append(stats_table)
         story.append(Spacer(1, 0.3 * inch))
@@ -676,7 +683,7 @@ class RapportInterface(QMainWindow):
         # Ajuster les largeurs pour que tout tienne dans les cases
         ip_table = Table(ip_data, colWidths=[1.2 * inch, 0.5 * inch, 0.5 * inch, 0.6 * inch, 0.5 * inch, 2.5 * inch])
         ip_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#132F4C')),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E293B')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
             ('ALIGN', (1, 1), (4, -1), 'CENTER'),
@@ -687,8 +694,8 @@ class RapportInterface(QMainWindow):
             ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
             ('TOPPADDING', (0, 1), (-1, -1), 4),
             ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
-            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#132F4C')),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#FFFFFF'), colors.HexColor('#F5F5F5')]),
+            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#334155')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#FFFFFF'), colors.HexColor('#F8FAFC')]),
             ('WORDWRAP', (5, 1), (5, -1), True)  # Activer le retour à la ligne pour la colonne des types
         ]))
         story.append(ip_table)
@@ -717,7 +724,7 @@ class RapportInterface(QMainWindow):
 
             # Style du tableau détaillé
             table_style = [
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#132F4C')),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E293B')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
                 ('ALIGN', (0, 1), (0, -1), 'CENTER'),
@@ -729,21 +736,21 @@ class RapportInterface(QMainWindow):
                 ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
                 ('TOPPADDING', (0, 1), (-1, -1), 5),
                 ('BOTTOMPADDING', (0, 1), (-1, -1), 5),
-                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#1E4976')),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#FFFFFF'), colors.HexColor('#F5F5F5')])
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#334155')),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#FFFFFF'), colors.HexColor('#F8FAFC')])
             ]
 
             # Coloration selon la sévérité
             for i, detail in enumerate(donnees['details'], start=1):
                 if detail['severite'].lower() in ['haute', 'high']:
-                    table_style.append(('BACKGROUND', (3, i), (3, i), colors.HexColor('#FFE6E6')))
-                    table_style.append(('TEXTCOLOR', (3, i), (3, i), colors.HexColor('#CC0000')))
+                    table_style.append(('BACKGROUND', (3, i), (3, i), colors.HexColor('#FEE2E2')))
+                    table_style.append(('TEXTCOLOR', (3, i), (3, i), colors.HexColor('#991B1B')))
                 elif detail['severite'].lower() in ['moyenne', 'medium']:
-                    table_style.append(('BACKGROUND', (3, i), (3, i), colors.HexColor('#FFF4CC')))
-                    table_style.append(('TEXTCOLOR', (3, i), (3, i), colors.HexColor('#996600')))
+                    table_style.append(('BACKGROUND', (3, i), (3, i), colors.HexColor('#FEF3C7')))
+                    table_style.append(('TEXTCOLOR', (3, i), (3, i), colors.HexColor('#92400E')))
                 else:
-                    table_style.append(('BACKGROUND', (3, i), (3, i), colors.HexColor('#E6FFE6')))
-                    table_style.append(('TEXTCOLOR', (3, i), (3, i), colors.HexColor('#006600')))
+                    table_style.append(('BACKGROUND', (3, i), (3, i), colors.HexColor('#D1FAE5')))
+                    table_style.append(('TEXTCOLOR', (3, i), (3, i), colors.HexColor('#065F46')))
 
             details_table.setStyle(TableStyle(table_style))
             story.append(details_table)
@@ -756,7 +763,7 @@ class RapportInterface(QMainWindow):
             'Footer',
             parent=styles['Normal'],
             fontSize=7,
-            textColor=colors.HexColor('#666666'),
+            textColor=colors.HexColor('#64748B'),
             alignment=1,
             fontName='Helvetica-Oblique'
         )
@@ -788,7 +795,7 @@ class RapportInterface(QMainWindow):
             'CustomTitle',
             parent=styles['Heading1'],
             fontSize=24,
-            textColor=colors.HexColor('#0A1929'),
+            textColor=colors.HexColor('#0F172A'),
             spaceAfter=20,
             alignment=1,
             fontName='Helvetica-Bold'
@@ -801,7 +808,7 @@ class RapportInterface(QMainWindow):
             'DateStyle',
             parent=styles['Normal'],
             fontSize=9,
-            textColor=colors.HexColor('#1E4976'),
+            textColor=colors.HexColor('#334155'),
             alignment=2,
             fontName='Helvetica'
         )
@@ -814,7 +821,7 @@ class RapportInterface(QMainWindow):
             'SummaryStyle',
             parent=styles['Heading2'],
             fontSize=14,
-            textColor=colors.HexColor('#132F4C'),
+            textColor=colors.HexColor('#1E293B'),
             spaceAfter=8,
             fontName='Helvetica-Bold'
         )
@@ -833,7 +840,7 @@ class RapportInterface(QMainWindow):
 
         stats_table = Table(stats_data, colWidths=[3 * inch, 1.5 * inch])
         stats_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E4976')),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E293B')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
@@ -842,9 +849,9 @@ class RapportInterface(QMainWindow):
             ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
             ('TOPPADDING', (0, 0), (-1, -1), 6),
             ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#F5F5F5')),
-            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#132F4C')),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#FFFFFF'), colors.HexColor('#F0F0F0')])
+            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#F8FAFC')),
+            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#334155')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#FFFFFF'), colors.HexColor('#F1F5F9')])
         ]))
         story.append(stats_table)
         story.append(Spacer(1, 0.3 * inch))
@@ -901,7 +908,7 @@ class RapportInterface(QMainWindow):
         ip_table = Table(ip_data,
                          colWidths=[1.1 * inch, 0.4 * inch, 0.4 * inch, 0.4 * inch, 0.4 * inch, 0.8 * inch, 2.5 * inch])
         ip_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#132F4C')),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E293B')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
             ('ALIGN', (1, 1), (4, -1), 'CENTER'),
@@ -913,8 +920,8 @@ class RapportInterface(QMainWindow):
             ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
             ('TOPPADDING', (0, 1), (-1, -1), 3),
             ('BOTTOMPADDING', (0, 1), (-1, -1), 3),
-            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#132F4C')),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#FFFFFF'), colors.HexColor('#F5F5F5')]),
+            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#334155')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#FFFFFF'), colors.HexColor('#F8FAFC')]),
             ('WORDWRAP', (6, 1), (6, -1), True)  # Activer le retour à la ligne pour la colonne des types
         ]))
         story.append(ip_table)
@@ -930,7 +937,7 @@ class RapportInterface(QMainWindow):
                 story.append(
                     Paragraph(f"Affichage des 50 événements les plus récents sur {len(tous_les_details)} au total",
                               ParagraphStyle('Note', parent=styles['Normal'], fontSize=8,
-                                             textColor=colors.HexColor('#666666'))))
+                                             textColor=colors.HexColor('#64748B'))))
                 story.append(Spacer(1, 0.1 * inch))
 
             # En-têtes du tableau détaillé
@@ -953,7 +960,7 @@ class RapportInterface(QMainWindow):
 
             # Style du tableau détaillé
             table_style = [
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#132F4C')),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E293B')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
                 ('ALIGN', (0, 1), (1, -1), 'CENTER'),
@@ -965,22 +972,22 @@ class RapportInterface(QMainWindow):
                 ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
                 ('TOPPADDING', (0, 1), (-1, -1), 3),
                 ('BOTTOMPADDING', (0, 1), (-1, -1), 3),
-                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#1E4976')),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#FFFFFF'), colors.HexColor('#F5F5F5')]),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#334155')),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#FFFFFF'), colors.HexColor('#F8FAFC')]),
                 ('WORDWRAP', (2, 1), (2, -1), True)  # Ajout du WORDWRAP pour la colonne Type (index 2)
             ]
 
             # Coloration selon la sévérité
             for i, detail in enumerate(details_a_afficher, start=1):
                 if detail['severite'].lower() in ['haute', 'high']:
-                    table_style.append(('BACKGROUND', (4, i), (4, i), colors.HexColor('#FFE6E6')))
-                    table_style.append(('TEXTCOLOR', (4, i), (4, i), colors.HexColor('#CC0000')))
+                    table_style.append(('BACKGROUND', (4, i), (4, i), colors.HexColor('#FEE2E2')))
+                    table_style.append(('TEXTCOLOR', (4, i), (4, i), colors.HexColor('#991B1B')))
                 elif detail['severite'].lower() in ['moyenne', 'medium']:
-                    table_style.append(('BACKGROUND', (4, i), (4, i), colors.HexColor('#FFF4CC')))
-                    table_style.append(('TEXTCOLOR', (4, i), (4, i), colors.HexColor('#996600')))
+                    table_style.append(('BACKGROUND', (4, i), (4, i), colors.HexColor('#FEF3C7')))
+                    table_style.append(('TEXTCOLOR', (4, i), (4, i), colors.HexColor('#92400E')))
                 else:
-                    table_style.append(('BACKGROUND', (4, i), (4, i), colors.HexColor('#E6FFE6')))
-                    table_style.append(('TEXTCOLOR', (4, i), (4, i), colors.HexColor('#006600')))
+                    table_style.append(('BACKGROUND', (4, i), (4, i), colors.HexColor('#D1FAE5')))
+                    table_style.append(('TEXTCOLOR', (4, i), (4, i), colors.HexColor('#065F46')))
 
             details_table.setStyle(TableStyle(table_style))
             story.append(details_table)
@@ -993,7 +1000,7 @@ class RapportInterface(QMainWindow):
             'Footer',
             parent=styles['Normal'],
             fontSize=7,
-            textColor=colors.HexColor('#666666'),
+            textColor=colors.HexColor('#64748B'),
             alignment=1,
             fontName='Helvetica-Oblique'
         )
@@ -1014,17 +1021,17 @@ def main():
     font = QFont("Consolas", 9)
     app.setFont(font)
 
-    # Palette de couleurs adaptée
+    # Palette de couleurs adaptée unifiée
     palette = QPalette()
-    palette.setColor(QPalette.ColorRole.Window, QColor(10, 25, 41))
-    palette.setColor(QPalette.ColorRole.WindowText, QColor(224, 224, 224))
-    palette.setColor(QPalette.ColorRole.Base, QColor(19, 47, 76))
-    palette.setColor(QPalette.ColorRole.AlternateBase, QColor(30, 73, 118))
-    palette.setColor(QPalette.ColorRole.Text, QColor(224, 224, 224))
-    palette.setColor(QPalette.ColorRole.Button, QColor(30, 73, 118))
-    palette.setColor(QPalette.ColorRole.ButtonText, QColor(255, 255, 255))
-    palette.setColor(QPalette.ColorRole.Highlight, QColor(52, 152, 219))
-    palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
+    palette.setColor(QPalette.ColorRole.Window, QColor("#0F172A"))
+    palette.setColor(QPalette.ColorRole.WindowText, QColor("#F8FAFC"))
+    palette.setColor(QPalette.ColorRole.Base, QColor("#1E293B"))
+    palette.setColor(QPalette.ColorRole.AlternateBase, QColor("#0F172A"))
+    palette.setColor(QPalette.ColorRole.Text, QColor("#F8FAFC"))
+    palette.setColor(QPalette.ColorRole.Button, QColor("#334155"))
+    palette.setColor(QPalette.ColorRole.ButtonText, QColor("#F8FAFC"))
+    palette.setColor(QPalette.ColorRole.Highlight, QColor("#38BDF8"))
+    palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#0F172A"))
 
     app.setPalette(palette)
 

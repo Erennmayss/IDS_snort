@@ -1,0 +1,17 @@
+# Environnement virtuel
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# IDE settings
+.idea/
+.vscode/
+
+# Données et Modèles (si trop lourds)
+*.pkl
+*.csv
+*.json

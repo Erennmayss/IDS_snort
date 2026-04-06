@@ -2,43 +2,38 @@ import sys
 import os
 from datetime import datetime, timedelta
 
-# Ajouter le chemin parent pour pouvoir importer depuis data
+# Permet d'importer depuis le dossier parent
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QLabel,
-    QFrame, QGridLayout, QGraphicsOpacityEffect, QGraphicsDropShadowEffect,
+    QFrame, QGridLayout, QGraphicsOpacityEffect,
     QHBoxLayout, QSizePolicy
 )
-from PyQt6.QtCore import (
-    Qt, QRect, QPropertyAnimation, QEasingCurve,
-    QParallelAnimationGroup, pyqtProperty, QTimer, QSize
-)
-from PyQt6.QtGui import QPalette, QColor, QFont
+from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup, QTimer
+from PyQt6.QtGui import QPalette, QColor
 
-# ================= IMPORTS MATPLOTLIB =================
 import matplotlib
-
 matplotlib.use("QtAgg")
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
-# Import du DatabaseManager
+# === IMPORTATION DE NOTRE NOUVELLE ARCHITECTURE ===
+from config import COLORS
+from gui.components import AnimatedLabel, FocusableFrame
 from data.dashboard import DatabaseManager
 
 
-# ================= HISTOGRAMME =================
 class TrafficHistogram(FigureCanvas):
     def __init__(self):
         self.fig = Figure(figsize=(5.5, 3.2), dpi=100)
         self.ax = self.fig.add_subplot(111)
         super().__init__(self.fig)
 
-        self.ax.set_facecolor("#1E2E4F")
-        self.fig.patch.set_facecolor("#1E2E4F")
+        self.ax.set_facecolor(COLORS['bg_dark'])
+        self.fig.patch.set_facecolor(COLORS['bg_dark'])
         self.fig.subplots_adjust(left=0.1, right=0.97, top=0.88, bottom=0.18)
 
-        # Ajustement: hauteur adaptable mais avec limites
         self.setMinimumHeight(250)
         self.setMaximumHeight(280)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
@@ -47,10 +42,10 @@ class TrafficHistogram(FigureCanvas):
 
     def update_histogram(self, data):
         self.ax.clear()
-        self.ax.set_facecolor("#1E2E4F")
+        self.ax.set_facecolor(COLORS['bg_dark'])
 
         heures = list(range(24))
-        couleurs = ['#44FF44' if val == 0 else '#FF4444' for val in data]
+        couleurs = [COLORS['success'] if val == 0 else COLORS['danger'] for val in data]
 
         bars = self.ax.bar(heures, data, color=couleurs, width=0.65,
                           edgecolor='white', linewidth=0.5, alpha=0.9)
@@ -75,154 +70,46 @@ class TrafficHistogram(FigureCanvas):
 
         for tick in self.ax.get_yticklabels():
             if tick.get_text() == 'NORMAL':
-                tick.set_color('#44FF44')
+                tick.set_color(COLORS['success'])
             else:
-                tick.set_color('#FF4444')
+                tick.set_color(COLORS['danger'])
 
         self.ax.grid(True, axis='y', alpha=0.2, linestyle='--', color='white', linewidth=0.5)
 
         self.ax.spines['top'].set_visible(False)
         self.ax.spines['right'].set_visible(False)
-        self.ax.spines['left'].set_color('#335889')
-        self.ax.spines['bottom'].set_color('#335889')
+        self.ax.spines['left'].set_color(COLORS['accent'])
+        self.ax.spines['bottom'].set_color(COLORS['accent'])
 
         for i, (heure, val) in enumerate(zip(heures, data)):
             if val == 1:
-                self.ax.text(heure, val + 0.05, '⚠️',
-                           ha='center', va='bottom', fontsize=8)
+                self.ax.text(heure, val + 0.05, '⚠️', ha='center', va='bottom', fontsize=8)
 
         self.draw()
 
 
-# ================= ANIMATED LABEL =================
-class AnimatedLabel(QLabel):
-    def __init__(self, text=""):
-        super().__init__(text)
-        self._scale = 0.35
-        self.update_style()
-
-    def getScale(self):
-        return self._scale
-
-    def setScale(self, value):
-        self._scale = value
-        self.update_style()
-
-    def update_style(self):
-        self.setStyleSheet(f"""
-            QLabel {{
-                color: #9b59b6;
-                font-size: {int(32 * self._scale)}px;
-                font-weight: bold;
-                font-style: italic;
-                font-family: 'Segoe UI';
-                padding: 15px;
-                background-color: none;
-                border-radius: 15px;
-            }}
-        """)
-
-    scale = pyqtProperty(float, getScale, setScale)
-
-
-# ================= FRAME AVEC EFFET =================
-class FocusableFrame(QFrame):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-
-        self.shadow_effect = QGraphicsDropShadowEffect()
-        self.shadow_effect.setBlurRadius(20)
-        self.shadow_effect.setColor(QColor("#9b59b6"))
-        self.shadow_effect.setOffset(0, 0)
-        self.shadow_effect.setEnabled(False)
-
-        self.setGraphicsEffect(self.shadow_effect)
-
-        self.focus_anim = QPropertyAnimation(self.shadow_effect, b"blurRadius")
-        self.focus_anim.setDuration(150)
-        self.focus_anim.setStartValue(20)
-        self.focus_anim.setEndValue(30)
-        self.focus_anim.setEasingCurve(QEasingCurve.Type.OutQuad)
-
-        self.focus_timer = QTimer()
-        self.focus_timer.setSingleShot(True)
-        self.focus_timer.timeout.connect(self.remove_focus)
-
-        self.click_anim = QPropertyAnimation(self, b"geometry")
-        self.click_anim.setDuration(200)
-        self.click_anim.setEasingCurve(QEasingCurve.Type.OutBack)
-
-    def mousePressEvent(self, event):
-        rect = self.geometry()
-        smaller = rect.adjusted(3, 3, -3, -3)
-        normal = rect
-
-        self.click_anim.setStartValue(smaller)
-        self.click_anim.setKeyValueAt(0.3, normal)
-        self.click_anim.setEndValue(normal)
-        self.click_anim.start()
-
-        self.apply_focus()
-        event.accept()
-
-    def apply_focus(self):
-        self.shadow_effect.setEnabled(True)
-        self.focus_anim.setDirection(QPropertyAnimation.Direction.Forward)
-        self.focus_anim.start()
-
-        current_style = self.styleSheet()
-        self.setStyleSheet(current_style + """
-            QFrame {
-                border: 2px solid rgba(155, 89, 182, 0.8);
-            }
-        """)
-
-        self.focus_timer.start(1000)
-
-    def remove_focus(self):
-        self.focus_anim.setDirection(QPropertyAnimation.Direction.Backward)
-        self.focus_anim.start()
-        QTimer.singleShot(150, self.restore_style)
-
-    def restore_style(self):
-        current_style = self.styleSheet()
-        base_style = current_style.replace("border: 2px solid rgba(155, 89, 182, 0.8);", "")
-        self.setStyleSheet(base_style)
-        self.shadow_effect.setEnabled(False)
-
-
-# ================= MAIN WINDOW =================
 class SimplePage(QWidget):
     def __init__(self):
         super().__init__()
-
-        # Initialisation du gestionnaire de base de données
         self.db_manager = DatabaseManager()
-
-        # Initialisation des variables
         self.attack_stats = {'total_attacks': 0, 'last_hour_attacks': 0, 'severity_counts': {}}
         self.total_packets = 0
         self.risk_level = 0
 
-        # Pas de titre de fenêtre (sera géré par main)
-        # Pas de taille fixe - laisser le layout du main gérer
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
-        # Background
         self.setAutoFillBackground(True)
         palette = self.palette()
-        palette.setColor(QPalette.ColorRole.Window, QColor("#1E2E4F"))
+        palette.setColor(QPalette.ColorRole.Window, QColor(COLORS['bg_dark']))
         self.setPalette(palette)
 
-        # ================= MAIN FRAME =================
         self.cadre = QFrame()
-        self.cadre.setStyleSheet("""
-            QFrame {
-                background-color: #335889;
+        self.cadre.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['bg_medium']};
                 border-radius: 20px;
                 padding: 20px;
-            }
+            }}
         """)
 
         main_layout_global = QVBoxLayout(self)
@@ -232,7 +119,6 @@ class SimplePage(QWidget):
         main_layout = QVBoxLayout(self.cadre)
         main_layout.setSpacing(15)
 
-        # ================= TITLE =================
         self.title = AnimatedLabel("TABLEAU DE BORD - SYSTÈME DE DÉTECTION D'INTRUSION")
         self.title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(self.title)
@@ -260,38 +146,23 @@ class SimplePage(QWidget):
         self.group.addAnimation(self.scale_anim)
         self.group.start()
 
-        # ================= GRID AVEC 4 CADRES =================
         grid_layout = QGridLayout()
         grid_layout.setSpacing(15)
 
-        # Mise à jour des données initiales
         self.update_data_from_db()
 
-        # Cadres 1, 2, 3 (identiques)
-        self.cadre1 = self.create_inner_frame(
-            "📊 NOMBRE TOTAL DE PAQUETS ANALYSÉS",
-            self.format_packets_display()
-        )
+        self.cadre1 = self.create_inner_frame("📊 NOMBRE TOTAL DE PAQUETS ANALYSÉS", self.format_packets_display())
+        self.cadre2 = self.create_inner_frame("⚠️ NOMBRE D'ATTAQUES DÉTECTÉES", self.format_attacks_display())
+        self.cadre3 = self.create_inner_frame("🎯 NIVEAU DE RISQUE GLOBAL", self.format_risk_display())
 
-        self.cadre2 = self.create_inner_frame(
-            "⚠️ NOMBRE D'ATTAQUES DÉTECTÉES",
-            self.format_attacks_display()
-        )
-
-        self.cadre3 = self.create_inner_frame(
-            "🎯 NIVEAU DE RISQUE GLOBAL",
-            self.format_risk_display()
-        )
-
-        # ================= CADRE 4 AVEC HISTOGRAMME =================
         self.cadre4 = FocusableFrame()
-        self.cadre4.setStyleSheet("""
-            QFrame {
-                background-color: #1E2E4F;
+        self.cadre4.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['bg_dark']};
                 border-radius: 20px;
                 padding: 15px;
-                border: 2px solid #335889;
-            }
+                border: 2px solid {COLORS['accent']};
+            }}
         """)
 
         layout4 = QVBoxLayout(self.cadre4)
@@ -299,17 +170,16 @@ class SimplePage(QWidget):
         layout4.setContentsMargins(10, 10, 10, 10)
 
         title4 = QLabel("📈 ÉTAT DU TRAFIC EN TEMPS RÉEL")
-        title4.setStyleSheet("""
+        title4.setStyleSheet(f"""
             color: white;
             font-size: 16px;
             font-weight: bold;
-            border-bottom: 2px solid #335889;
+            border-bottom: 2px solid {COLORS['accent']};
             padding-bottom: 8px;
         """)
         title4.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout4.addWidget(title4)
 
-        # Légende intégrée
         legend_widget = QWidget()
         legend_layout = QHBoxLayout(legend_widget)
         legend_layout.setSpacing(20)
@@ -317,26 +187,23 @@ class SimplePage(QWidget):
         legend_layout.setContentsMargins(0, 5, 0, 5)
 
         normal_label = QLabel("🟢 NORMAL (0)")
-        normal_label.setStyleSheet("color: #44FF44; font-size: 11px; font-weight: bold;")
+        normal_label.setStyleSheet(f"color: {COLORS['success']}; font-size: 11px; font-weight: bold;")
         legend_layout.addWidget(normal_label)
 
         attaque_label = QLabel("🔴 ATTAQUE (1)")
-        attaque_label.setStyleSheet("color: #FF4444; font-size: 11px; font-weight: bold;")
+        attaque_label.setStyleSheet(f"color: {COLORS['danger']}; font-size: 11px; font-weight: bold;")
         legend_layout.addWidget(attaque_label)
 
         layout4.addWidget(legend_widget)
 
-        # Histogramme
         self.histogram = TrafficHistogram()
         layout4.addWidget(self.histogram)
 
-        # Ajouter les cadres à la grille
         grid_layout.addWidget(self.cadre1, 0, 0)
         grid_layout.addWidget(self.cadre2, 0, 1)
         grid_layout.addWidget(self.cadre3, 1, 0)
         grid_layout.addWidget(self.cadre4, 1, 1)
 
-        # Configuration des proportions
         grid_layout.setRowStretch(0, 1)
         grid_layout.setRowStretch(1, 1)
         grid_layout.setColumnStretch(0, 1)
@@ -344,11 +211,9 @@ class SimplePage(QWidget):
 
         main_layout.addLayout(grid_layout)
 
-        # Initialisation de l'histogramme
         hist_data = self.db_manager.get_attacks_last_24h()
         self.histogram.update_histogram(hist_data)
 
-        # Timer pour rafraîchir
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.refresh_dashboard)
         self.update_timer.start(5000)
@@ -423,8 +288,6 @@ class SimplePage(QWidget):
             hist_data = self.db_manager.get_attacks_last_24h()
             self.histogram.update_histogram(hist_data)
 
-            print(f"✅ Dashboard mis à jour - Attaques: {new_attacks}, Risque: {self.risk_level}%")
-
         except Exception as e:
             print(f"❌ Erreur mise à jour: {e}")
 
@@ -437,23 +300,23 @@ class SimplePage(QWidget):
 
     def create_inner_frame(self, title_text, content_text):
         frame = FocusableFrame()
-        frame.setStyleSheet("""
-            QFrame {
-                background-color: #1E2E4F;
+        frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['bg_dark']};
                 border-radius: 20px;
                 padding: 15px;
-            }
+            }}
         """)
 
         layout = QVBoxLayout(frame)
         layout.setSpacing(10)
 
         title = QLabel(title_text)
-        title.setStyleSheet("""
+        title.setStyleSheet(f"""
             color: white;
             font-size: 14px;
             font-weight: bold;
-            border-bottom: 2px solid #335889;
+            border-bottom: 2px solid {COLORS['accent']};
             padding-bottom: 8px;
         """)
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -476,7 +339,6 @@ class SimplePage(QWidget):
         if hasattr(self, 'db_manager') and self.db_manager.connection:
             self.db_manager.close_connection()
         event.accept()
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

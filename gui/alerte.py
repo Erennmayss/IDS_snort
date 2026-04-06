@@ -1,6 +1,6 @@
+# alerte.py (version modifiée utilisant alerts_db)
 import sys
 import os
-import psycopg2
 from datetime import datetime
 
 # Permet d'importer depuis le dossier parent
@@ -20,11 +20,12 @@ from PyQt6.QtGui import QColor, QFont, QPalette
 # === IMPORTATION DE NOTRE ARCHITECTURE ===
 from config import DB_CONFIG, COLORS
 from gui.components import AnimatedLabel, LoadingOverlay
+from data.alertes  import get_snort_alerts, get_attack_types
 
 # ================== STYLES MODERNES (SaaS) ==================
 INPUT_STYLE = f"""
     QComboBox, QDateEdit, QLineEdit, QSpinBox {{
-        background-color: #334155;  /* Fond plus clair pour les inputs */
+        background-color: #334155;
         color: white;
         padding: 8px 12px;
         border: 1px solid #475569;
@@ -33,7 +34,7 @@ INPUT_STYLE = f"""
     }}
     QComboBox:focus, QDateEdit:focus, QLineEdit:focus, QSpinBox:focus {{
         border: 1px solid {COLORS['info']};
-        background-color: #3F51B5; /* Légère surbrillance au clic */
+        background-color: #3F51B5;
     }}
     QComboBox::drop-down, QDateEdit::drop-down {{
         border: none;
@@ -51,7 +52,7 @@ INPUT_STYLE = f"""
 
 BTN_PRIMARY_STYLE = f"""
     QPushButton {{
-        background-color: #0EA5E9; /* Bleu moderne et lumineux */
+        background-color: #0EA5E9;
         color: white;
         padding: 8px 18px;
         border-radius: 6px;
@@ -68,7 +69,7 @@ BTN_PRIMARY_STYLE = f"""
 
 BTN_SECONDARY_STYLE = f"""
     QPushButton {{
-        background-color: #334155; /* Plus clair que le fond */
+        background-color: #334155;
         color: white;
         padding: 8px 15px;
         border-radius: 6px;
@@ -99,58 +100,14 @@ class DataLoaderThread(QThread):
 
     def run(self):
         try:
-            conn = psycopg2.connect(**DB_CONFIG)
-            cursor = conn.cursor()
-
-            query = """
-            SELECT timestamp, source_ip, destination_ip, attack_type, severity, detection_engine
-            FROM security_alerts WHERE 1=1
-            """
-            params = []
-
-            if self.filters.get('date'):
-                query += " AND DATE(timestamp) = %s"
-                params.append(self.filters['date'])
-
-            if self.filters.get('severity') and self.filters['severity'] != "Toutes":
-                query += " AND severity = %s"
-                params.append(self.filters['severity'])
-
-            if self.filters.get('attack_type') and self.filters['attack_type'] != "Tous":
-                query += " AND attack_type = %s"
-                params.append(self.filters['attack_type'])
-
-            if self.filters.get('ip_search'):
-                ip_pattern = f"%{self.filters['ip_search']}%"
-                query += " AND (source_ip LIKE %s OR destination_ip LIKE %s)"
-                params.extend([ip_pattern, ip_pattern])
-
-            query += " ORDER BY timestamp DESC"
-            cursor.execute(query, params)
-            rows = cursor.fetchall()
-
-            total_rows = len(rows)
-            snort_data = []
-
-            for i, row in enumerate(rows):
-                if not self.running: break
-                date = row[0].strftime("%d/%m/%Y %H:%M:%S")
-                src, dst, attack, severity, engine = row[1], row[2], row[3], row[4], row[5]
-                if engine.lower() == "snort":
-                    snort_data.append([date, src, dst, attack, severity])
-                if i % 100 == 0:
-                    self.progress_update.emit(int((i + 1) / total_rows * 100) if total_rows > 0 else 0)
+            # Utilisation de la fonction du module alerts_db
+            snort_data = get_snort_alerts(self.filters)
 
             self.progress_update.emit(100)
             self.data_loaded.emit(snort_data)
 
-        except psycopg2.OperationalError as e:
-            self.error_occurred.emit(f"Erreur DB: {str(e)}")
         except Exception as e:
             self.error_occurred.emit(f"Erreur chargement: {str(e)}")
-        finally:
-            if 'cursor' in locals(): cursor.close()
-            if 'conn' in locals(): conn.close()
 
     def stop(self):
         self.running = False
@@ -317,22 +274,12 @@ class AlertInterface(QMainWindow):
             finished = pyqtSignal(list)
 
             def run(self):
-                types = ["Tous"]
-                try:
-                    conn = psycopg2.connect(**DB_CONFIG)
-                    cur = conn.cursor()
-                    cur.execute("SELECT DISTINCT attack_type::text FROM security_alerts ORDER BY attack_type")
-                    for row in cur.fetchall():
-                        if row[0]: types.append(str(row[0]))
-                    cur.close()
-                    conn.close()
-                except Exception:
-                    pass
-                finally:
-                    self.finished.emit(types)
+                # Utilisation de la fonction du module alerts_db
+                types = get_attack_types()
+                self.finished.emit(types)
 
         self.attack_loader = AttackTypesLoader()
-        self.attack_loader.finished.connect(lambda types: self.attack_type_combo.addItems(types[1:]))
+        self.attack_loader.finished.connect(lambda types: self.attack_type_combo.addItems(types))
         self.attack_loader.start()
 
     def setup_pagination_bar(self, parent_layout):

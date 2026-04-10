@@ -98,7 +98,8 @@ class SimplePage(QWidget):
         self.attack_stats = {'total_attacks': 0, 'last_hour_attacks': 0, 'severity_counts': {}}
         self.total_packets = 0
         self.risk_level = 0
-        self.is_running = False  # Démarré à FALSE (arrêté par défaut)
+        self.snort_running = False
+        self.snort_process = None
 
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
@@ -261,80 +262,12 @@ class SimplePage(QWidget):
         # ⚡ NE PAS démarrer le timer automatiquement
 
     def toggle_system(self):
-        """Active ou désactive Snort et la mise à jour en temps réel"""
-        if self.is_running:
-            # === ARRÊTER LE SYSTÈME ===
-            # 1. Arrêter Snort
-            self.snort.stop_snort()
+        if not hasattr(self, "snort_running"):
+            self.snort_running = False
 
-            # 2. Arrêter le timer de mise à jour
-            self.update_timer.stop()
-
-            # 3. Mettre à jour l'état
-            self.is_running = False
-
-            # 4. Changer le bouton en START (bleu)
-            self.start_stop_btn.setText("▶️ START")
-            self.start_stop_btn.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: {COLORS['info']};
-                    color: white;
-                    border: none;
-                    border-radius: 10px;
-                    font-size: 14px;
-                    font-weight: bold;
-                    padding: 8px 16px;
-                }}
-                QPushButton:hover {{
-                    background-color: {COLORS['info']}cc;
-                }}
-                QPushButton:pressed {{
-                    background-color: {COLORS['info']}99;
-                }}
-            """)
-            print("🛑 Snort ARRÊTÉ - Surveillance terminée")
-
-        else:
-            # === DÉMARRER LE SYSTÈME ===
-            # 1. Démarrer Snort
-            success = self.snort.start_snort()
-
-            if success:
-                # 2. Démarrer le timer de mise à jour
-                self.update_timer.start(5000)
-
-                # 3. Mettre à jour l'état
-                self.is_running = True
-
-                # 4. Changer le bouton en STOP (rouge)
-                self.start_stop_btn.setText("⏹️ STOP")
-                self.start_stop_btn.setStyleSheet(f"""
-                    QPushButton {{
-                        background-color: {COLORS['danger']};
-                        color: white;
-                        border: none;
-                        border-radius: 10px;
-                        font-size: 14px;
-                        font-weight: bold;
-                        padding: 8px 16px;
-                    }}
-                    QPushButton:hover {{
-                        background-color: {COLORS['danger']}cc;
-                    }}
-                    QPushButton:pressed {{
-                        background-color: {COLORS['danger']}99;
-                    }}
-                """)
-
-                # 5. Rafraîchir immédiatement les données
-                self.refresh_dashboard()
-                print("✅ Snort DÉMARRÉ - Surveillance active")
-            else:
-                # Si Snort n'a pas pu démarrer, afficher une erreur
-                self.start_stop_btn.setText("❌ ERREUR")
-                QTimer.singleShot(2000, self.reset_button_text)
-                if not self.snort_running:
-                    print("⚠️ Snort non démarré (vérification ignorée si déjà running)")
+        if not self.snort_running:
+            print("Snort is not running")
+            return
 
     def reset_button_text(self):
         """Réinitialise le texte du bouton après une erreur"""

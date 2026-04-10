@@ -25,7 +25,6 @@ from gui.components import AnimatedLabel, FocusableFrame
 from data.dashboard import DatabaseManager
 from snort_module.lancement import SnortManager  # ✅ Import du SnortManager
 
-
 class TrafficHistogram(FigureCanvas):
     def __init__(self):
         self.fig = Figure(figsize=(5.5, 3.2), dpi=100)

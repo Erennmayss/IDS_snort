@@ -334,7 +334,8 @@ class SimplePage(QWidget):
                 # Si Snort n'a pas pu démarrer, afficher une erreur
                 self.start_stop_btn.setText("❌ ERREUR")
                 QTimer.singleShot(2000, self.reset_button_text)
-                print("❌ Erreur: Impossible de démarrer Snort")
+                if not self.snort_running:
+                    print("⚠️ Snort non démarré (vérification ignorée si déjà running)")
 
     def reset_button_text(self):
         """Réinitialise le texte du bouton après une erreur"""

@@ -268,18 +268,11 @@ class SimplePage(QWidget):
         if self.is_running:
             # === ARRÊTER LE SYSTÈME ===
             print("🛑 Arrêt du système...")
-
-            # 1. Arrêter Snort
             self.snort.stop_snort()
-
-            # 2. Arrêter le timer de mise à jour
             self.update_timer.stop()
-
-            # 3. Mettre à jour les états
             self.is_running = False
             self.snort_running = False
 
-            # 4. Changer le bouton en START (bleu)
             self.start_stop_btn.setText("▶️ START")
             self.start_stop_btn.setStyleSheet(f"""
                 QPushButton {{
@@ -298,25 +291,22 @@ class SimplePage(QWidget):
                     background-color: {COLORS['info']}99;
                 }}
             """)
-            print("✅ Snort arrêté avec succès")
+            print("✅ Système arrêté")
 
         else:
             # === DÉMARRER LE SYSTÈME ===
             print("🚀 Démarrage du système...")
 
-            # 1. Démarrer Snort
-            self.snort.start_snort()
+            # Démarrer Snort
+            success = self.snort.start_snort()
 
-            # 2. Vérifier si Snort a bien démarré
-            if self.snort.snort_running:
-                # 3. Démarrer le timer de mise à jour
+            # Vérifier si Snort tourne vraiment
+            if success or self.snort.is_running():
+                # Démarrer le timer de mise à jour
                 self.update_timer.start(5000)
-
-                # 4. Mettre à jour les états
                 self.is_running = True
                 self.snort_running = True
 
-                # 5. Changer le bouton en STOP (rouge)
                 self.start_stop_btn.setText("⏹️ STOP")
                 self.start_stop_btn.setStyleSheet(f"""
                     QPushButton {{
@@ -336,14 +326,13 @@ class SimplePage(QWidget):
                     }}
                 """)
 
-                # 6. Rafraîchir immédiatement les données
+                # Rafraîchir immédiatement
                 self.refresh_dashboard()
-                print("✅ Snort démarré avec succès")
+                print("✅ Système démarré avec succès")
             else:
-                # Si Snort n'a pas pu démarrer
-                print("❌ ERREUR: Impossible de démarrer Snort")
                 self.start_stop_btn.setText("❌ ERREUR")
-                QTimer.singleShot(2000, self.reset_button_text)
+                print("❌ Échec du démarrage de Snort")
+                QTimer.singleShot(3000, self.reset_button_text)
 
     def reset_button_text(self):
         """Réinitialise le texte du bouton après une erreur"""

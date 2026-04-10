@@ -237,7 +237,7 @@ class SimplePage(QWidget):
         severity = self.attack_stats['severity_counts']
         text = f"{total} ATTAQUES"
         if severity:
-            text += f"\n🔴 {severity.get('Élevée', 0)}  |  🟡 {severity.get('Moyenne', 0)}  |  🟢 {severity.get('Basse', 0)}"
+            text += f"\n🔴 {severity.get('élevée', 0)}  |  🟡 {severity.get('Moyenne', 0)}  |  🟢 {severity.get('Basse', 0)}"
         text += f"\n+{last_hour} dernière heure"
         return text
 
@@ -281,7 +281,7 @@ class SimplePage(QWidget):
                 severity = self.attack_stats['severity_counts']
                 text = f"{new_attacks} ATTAQUES{attack_indicator}"
                 if severity:
-                    text += f"\n🔴 {severity.get('Élevée', 0)}  |  🟡 {severity.get('Moyenne', 0)}  |  🟢 {severity.get('Basse', 0)}"
+                    text += f"\n🔴 {severity.get('élevée', 0)}  |  🟡 {severity.get('Moyenne', 0)}  |  🟢 {severity.get('Basse', 0)}"
                 text += f"\n+{new_last_hour} dernière heure"
                 new_content2 = text
 
@@ -290,6 +290,7 @@ class SimplePage(QWidget):
 
             hist_data = self.db_manager.get_attacks_last_24h()
             self.histogram.update_histogram(hist_data)
+            print("TOTAL:", self.attack_stats['total_attacks'])
 
         except Exception as e:
             print(f"❌ Erreur mise à jour: {e}")

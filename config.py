@@ -6,8 +6,8 @@ DB_CONFIG = {
     'host': os.getenv('DB_HOST', '192.168.1.2'),
     'port': os.getenv('DB_PORT', '5432'),
     'database': os.getenv('DB_NAME', 'ids_db'),
-    'user': os.getenv('DB_USER', 'aya'),
-    'password': os.getenv('DB_PASSWORD', 'aya'),
+    'user': os.getenv('DB_USER', 'marwa'),
+    'password': os.getenv('DB_PASSWORD', 'marwa'),
     'connect_timeout': 5
 }
 

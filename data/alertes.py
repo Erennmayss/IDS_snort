@@ -16,7 +16,7 @@ def get_attack_types():
 
     try:
         with conn.cursor() as cursor:
-            cursor.execute("SELECT DISTINCT attack_type FROM security_alerts ORDER BY attack_type")
+            cursor.execute("SELECT DISTINCT attack_type FROM alertes ORDER BY attack_type")
             rows = cursor.fetchall()
             return [str(row[0]) for row in rows if row[0]]
     except Exception as e:
@@ -29,30 +29,23 @@ def get_attack_types():
 def get_snort_alerts(filters=None):
     """
     Récupère les alertes Snort filtrées de la BDD
-
-    Args:
-        filters (dict): Dictionnaire contenant les filtres
-            - date (str): Date au format YYYY-MM-DD
-            - severity (str): Niveau de gravité
-            - attack_type (str): Type d'attaque
-            - ip_search (str): Recherche IP
-
-    Returns:
-        list: Liste des alertes Snort
+    Note: detection_engine = '1' pour Snort
     """
     conn = connect_db()
     if conn is None:
+        print("❌ [get_snort_alerts] Connexion échouée")
         return []
 
     filters = filters or {}
 
     try:
         with conn.cursor() as cursor:
-            # Construction de la requête avec les filtres
+            # MODIFICATION: detection_engine = '1' pour Snort
             query = """
-            SELECT timestamp, source_ip, destination_ip, attack_type, severity
-            FROM security_alerts
-            WHERE detection_engine = 'Snort'
+            SELECT timestamp, source_ip, destination_ip, attack_type, severity, 
+                   protocol, source_port, destination_port, details
+            FROM alertes
+            WHERE detection_engine = '1'
             """
             params = []
 
@@ -79,8 +72,13 @@ def get_snort_alerts(filters=None):
 
             query += " ORDER BY timestamp DESC"
 
+            print(f"[DEBUG] Requête SQL: {query}")
+            print(f"[DEBUG] Paramètres: {params}")
+
             cursor.execute(query, params)
             rows = cursor.fetchall()
+
+            print(f"[DEBUG] Nombre de lignes trouvées: {len(rows)}")
 
             snort_data = []
             for row in rows:
@@ -89,12 +87,29 @@ def get_snort_alerts(filters=None):
                 dst = row[2]
                 attack = row[3]
                 severity = row[4]
-                snort_data.append([date, src, dst, attack, severity])
+                protocol = row[5] if len(row) > 5 else "N/A"
+                src_port = row[6] if len(row) > 6 else "N/A"
+                dst_port = row[7] if len(row) > 7 else "N/A"
+                details = row[8] if len(row) > 8 else ""
+
+                snort_data.append({
+                    'date': date,
+                    'source_ip': src,
+                    'destination_ip': dst,
+                    'attack_type': attack,
+                    'severity': severity,
+                    'protocol': protocol,
+                    'source_port': src_port,
+                    'destination_port': dst_port,
+                    'details': details
+                })
 
             return snort_data
 
     except Exception as e:
         print(f"❌ Erreur lors de la récupération des alertes Snort : {e}")
+        import traceback
+        traceback.print_exc()
         return []
     finally:
         conn.close()
@@ -110,10 +125,11 @@ def get_snort_alerts_count(filters=None):
 
     try:
         with conn.cursor() as cursor:
+            # MODIFICATION: detection_engine = '1' pour Snort
             query = """
             SELECT COUNT(*)
-            FROM security_alerts
-            WHERE detection_engine = 'Snort'
+            FROM alertes
+            WHERE detection_engine = '1'
             """
             params = []
 
@@ -148,12 +164,7 @@ def get_snort_alerts_count(filters=None):
 def get_all_alerts(filters=None):
     """
     Récupère toutes les alertes (Snort + ML) avec filtres
-
-    Args:
-        filters (dict): Dictionnaire contenant les filtres
-
-    Returns:
-        tuple: (ml_data, snort_data) - listes d'alertes
+    Note: detection_engine = '1' pour Snort, '0' pour ML
     """
     conn = connect_db()
     if conn is None:
@@ -164,8 +175,9 @@ def get_all_alerts(filters=None):
     try:
         with conn.cursor() as cursor:
             query = """
-            SELECT timestamp, source_ip, destination_ip, attack_type, severity, detection_engine
-            FROM security_alerts
+            SELECT timestamp, source_ip, destination_ip, attack_type, severity, 
+                   detection_engine, protocol, source_port, destination_port, details
+            FROM alertes
             WHERE 1=1
             """
             params = []
@@ -201,13 +213,28 @@ def get_all_alerts(filters=None):
                 dst = row[2]
                 attack = row[3]
                 severity = row[4]
-                engine = row[5]
+                engine = str(row[5]) if row[5] is not None else ""  # '1' pour Snort, '0' pour ML
+                protocol = row[6] if len(row) > 6 else "N/A"
+                src_port = row[7] if len(row) > 7 else "N/A"
+                dst_port = row[8] if len(row) > 8 else "N/A"
+                details = row[9] if len(row) > 9 else ""
 
-                alert = [date, src, dst, attack, severity]
+                alert = {
+                    'date': date,
+                    'source_ip': src,
+                    'destination_ip': dst,
+                    'attack_type': attack,
+                    'severity': severity,
+                    'protocol': protocol,
+                    'source_port': src_port,
+                    'destination_port': dst_port,
+                    'details': details
+                }
 
-                if engine and engine.lower() == "ml":
+                # MODIFICATION: '0' pour ML, '1' pour Snort
+                if engine == '0':  # ML
                     ml_data.append(alert)
-                elif engine and engine.lower() == "Snort":
+                elif engine == '1':  # Snort
                     snort_data.append(alert)
 
             return ml_data, snort_data
@@ -229,10 +256,11 @@ def get_alerts_by_severity(filters=None):
 
     try:
         with conn.cursor() as cursor:
+            # MODIFICATION: detection_engine = '1' pour Snort
             query = """
             SELECT severity, COUNT(*)
-            FROM security_alerts
-            WHERE detection_engine = 'Snort'
+            FROM alertes
+            WHERE detection_engine = '1'
             """
             params = []
 
@@ -277,10 +305,12 @@ def get_recent_snort_alerts(limit=50):
 
     try:
         with conn.cursor() as cursor:
+            # MODIFICATION: detection_engine = '1' pour Snort
             cursor.execute("""
-                SELECT timestamp, source_ip, destination_ip, attack_type, severity
-                FROM security_alerts
-                WHERE detection_engine = 'Snort'
+                SELECT timestamp, source_ip, destination_ip, attack_type, severity, 
+                       protocol, source_port, destination_port, details
+                FROM alertes
+                WHERE detection_engine = '1'
                 ORDER BY timestamp DESC
                 LIMIT %s
             """, (limit,))
@@ -293,7 +323,11 @@ def get_recent_snort_alerts(limit=50):
                     'source_ip': row[1],
                     'destination_ip': row[2],
                     'attack_type': row[3],
-                    'severity': row[4]
+                    'severity': row[4],
+                    'protocol': row[5] if len(row) > 5 else "N/A",
+                    'source_port': row[6] if len(row) > 6 else "N/A",
+                    'destination_port': row[7] if len(row) > 7 else "N/A",
+                    'details': row[8] if len(row) > 8 else ""
                 })
 
             return alerts
@@ -313,10 +347,12 @@ def get_snort_alerts_by_ip(ip, limit=100):
 
     try:
         with conn.cursor() as cursor:
+            # MODIFICATION: detection_engine = '1' pour Snort
             cursor.execute("""
-                SELECT timestamp, source_ip, destination_ip, attack_type, severity
-                FROM security_alerts
-                WHERE detection_engine = 'Snort'
+                SELECT timestamp, source_ip, destination_ip, attack_type, severity,
+                       protocol, source_port, destination_port, details
+                FROM alertes
+                WHERE detection_engine = '1'
                 AND (source_ip = %s OR destination_ip = %s)
                 ORDER BY timestamp DESC
                 LIMIT %s
@@ -330,7 +366,11 @@ def get_snort_alerts_by_ip(ip, limit=100):
                     'source_ip': row[1],
                     'destination_ip': row[2],
                     'attack_type': row[3],
-                    'severity': row[4]
+                    'severity': row[4],
+                    'protocol': row[5] if len(row) > 5 else "N/A",
+                    'source_port': row[6] if len(row) > 6 else "N/A",
+                    'destination_port': row[7] if len(row) > 7 else "N/A",
+                    'details': row[8] if len(row) > 8 else ""
                 })
 
             return alerts
@@ -350,10 +390,12 @@ def get_snort_alerts_by_date_range(start_date, end_date):
 
     try:
         with conn.cursor() as cursor:
+            # MODIFICATION: detection_engine = '1' pour Snort
             cursor.execute("""
-                SELECT timestamp, source_ip, destination_ip, attack_type, severity
-                FROM security_alerts
-                WHERE detection_engine = 'Snort'
+                SELECT timestamp, source_ip, destination_ip, attack_type, severity,
+                       protocol, source_port, destination_port, details
+                FROM alertes
+                WHERE detection_engine = '1'
                 AND DATE(timestamp) BETWEEN %s AND %s
                 ORDER BY timestamp DESC
             """, (start_date, end_date))
@@ -361,8 +403,17 @@ def get_snort_alerts_by_date_range(start_date, end_date):
 
             alerts = []
             for row in rows:
-                date = row[0].strftime("%d/%m/%Y %H:%M:%S")
-                alerts.append([date, row[1], row[2], row[3], row[4]])
+                alerts.append({
+                    'timestamp': row[0].strftime("%d/%m/%Y %H:%M:%S"),
+                    'source_ip': row[1],
+                    'destination_ip': row[2],
+                    'attack_type': row[3],
+                    'severity': row[4],
+                    'protocol': row[5] if len(row) > 5 else "N/A",
+                    'source_port': row[6] if len(row) > 6 else "N/A",
+                    'destination_port': row[7] if len(row) > 7 else "N/A",
+                    'details': row[8] if len(row) > 8 else ""
+                })
 
             return alerts
 
@@ -381,10 +432,11 @@ def get_top_attack_types_snort(limit=5):
 
     try:
         with conn.cursor() as cursor:
+            # MODIFICATION: detection_engine = '1' pour Snort
             cursor.execute("""
                 SELECT attack_type, COUNT(*) as count
-                FROM security_alerts
-                WHERE detection_engine = 'Snort'
+                FROM alertes
+                WHERE detection_engine = '1'
                 GROUP BY attack_type
                 ORDER BY count DESC
                 LIMIT %s
@@ -408,10 +460,11 @@ def get_top_source_ips_snort(limit=5):
 
     try:
         with conn.cursor() as cursor:
+            # MODIFICATION: detection_engine = '1' pour Snort
             cursor.execute("""
                 SELECT source_ip, COUNT(*) as count
-                FROM security_alerts
-                WHERE detection_engine = 'Snort'
+                FROM alertes
+                WHERE detection_engine = '1'
                 GROUP BY source_ip
                 ORDER BY count DESC
                 LIMIT %s
@@ -427,21 +480,33 @@ def get_top_source_ips_snort(limit=5):
         conn.close()
 
 
-def add_alert(timestamp, source_ip, destination_ip, attack_type, severity, detection_engine):
-    """Ajoute une nouvelle alerte dans la BDD"""
+def add_alert(timestamp, source_ip, destination_ip, attack_type, severity, detection_engine,
+              protocol=None, source_port=None, destination_port=None, details=None,
+              loss=None, volume=None, service=None):
+    """Ajoute une nouvelle alerte dans la BDD avec tous les champs"""
     conn = connect_db()
     if conn is None:
         return False
 
     try:
         with conn.cursor() as cursor:
+            # Convertir detection_engine en '1' pour Snort ou '0' pour ML
+            if detection_engine == 'Snort':
+                engine = '1'
+            elif detection_engine == 'ML':
+                engine = '0'
+            else:
+                engine = str(detection_engine)
+
             cursor.execute("""
-                INSERT INTO security_alerts 
-                (timestamp, source_ip, destination_ip, attack_type, severity, detection_engine)
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """, (timestamp, source_ip, destination_ip, attack_type, severity, detection_engine))
+                INSERT INTO alertes 
+                (timestamp, source_ip, destination_ip, attack_type, severity, detection_engine,
+                 protocol, source_port, destination_port, details, loss, volume, service)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (timestamp, source_ip, destination_ip, attack_type, severity, engine,
+                  protocol, source_port, destination_port, details, loss, volume, service))
             conn.commit()
-            print(f"✅ Alerte ajoutée : {attack_type} depuis {source_ip}")
+            print(f"✅ Alerte ajoutée : {attack_type} depuis {source_ip} (engine: {engine})")
             return True
     except Exception as e:
         print(f"❌ Erreur lors de l'ajout de l'alerte : {e}")
@@ -459,7 +524,7 @@ def delete_old_alerts(days=30):
     try:
         with conn.cursor() as cursor:
             cursor.execute("""
-                DELETE FROM security_alerts
+                DELETE FROM alertes
                 WHERE timestamp < NOW() - INTERVAL '%s days'
             """, (days,))
             deleted_count = cursor.rowcount
@@ -481,10 +546,52 @@ def clear_all_alerts():
 
     try:
         with conn.cursor() as cursor:
-            cursor.execute("TRUNCATE TABLE security_alerts;")
+            cursor.execute("TRUNCATE TABLE alertes;")
             conn.commit()
             print("🧹 Toutes les alertes ont été supprimées.")
     except Exception as e:
         print(f"❌ Erreur lors de la suppression des alertes : {e}")
+    finally:
+        conn.close()
+
+
+def get_alert_details(alert_id):
+    """Récupère les détails complets d'une alerte spécifique par son ID"""
+    conn = connect_db()
+    if conn is None:
+        return None
+
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT id, timestamp, source_ip, destination_ip, attack_type, severity, 
+                       detection_engine, protocol, source_port, destination_port, details,
+                       loss, volume, service
+                FROM alertes
+                WHERE id = %s
+            """, (alert_id,))
+            row = cursor.fetchone()
+
+            if row:
+                return {
+                    'id': row[0],
+                    'timestamp': row[1].strftime("%d/%m/%Y %H:%M:%S"),
+                    'source_ip': row[2],
+                    'destination_ip': row[3],
+                    'attack_type': row[4],
+                    'severity': row[5],
+                    'detection_engine': row[6],
+                    'protocol': row[7],
+                    'source_port': row[8],
+                    'destination_port': row[9],
+                    'details': row[10],
+                    'loss': row[11],
+                    'volume': row[12],
+                    'service': row[13]
+                }
+            return None
+    except Exception as e:
+        print(f"❌ Erreur lors de la récupération des détails : {e}")
+        return None
     finally:
         conn.close()

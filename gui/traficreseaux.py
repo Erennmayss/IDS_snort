@@ -41,7 +41,7 @@ class TrafficAnalyzerInterface(QMainWindow):
         # Timer pour mise à jour en temps réel
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_data)
-        self.timer.start(3000)
+        self.timer.start(10000)
 
     def setup_style(self):
         """Configuration du style SaaS Moderne unifié"""

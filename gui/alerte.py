@@ -1,7 +1,6 @@
-#import sys
-import os
+# alerte.py
 import sys
-
+import os
 import psycopg2
 from datetime import datetime
 
@@ -13,7 +12,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout, QTableWidget, QTableWidgetItem,
     QHeaderView, QLabel, QPushButton, QComboBox,
     QGroupBox, QGridLayout, QLineEdit,
-    QDateEdit, QSpinBox, QMessageBox, QGraphicsOpacityEffect, QSizePolicy
+    QDateEdit, QSpinBox, QMessageBox, QGraphicsOpacityEffect
 )
 from PyQt6.QtCore import Qt, QTimer, QDate, QRect, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup, QThread, \
     pyqtSignal
@@ -98,7 +97,6 @@ class DataLoaderThread(QThread):
         super().__init__()
         self.filters = filters or {}
         self.running = True
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
     def run(self):
         try:
@@ -107,7 +105,7 @@ class DataLoaderThread(QThread):
 
             query = """
             SELECT timestamp, source_ip, destination_ip, attack_type, severity, detection_engine
-            FROM security_alerts WHERE 1=1
+            FROM alertes WHERE 1=1
             """
             params = []
 
@@ -129,31 +127,52 @@ class DataLoaderThread(QThread):
                 params.extend([ip_pattern, ip_pattern])
 
             query += " ORDER BY timestamp DESC"
+
+            print(f"[DEBUG] Requête SQL: {query}")
+            print(f"[DEBUG] Paramètres: {params}")
+
             cursor.execute(query, params)
             rows = cursor.fetchall()
 
             total_rows = len(rows)
+            print(f"[DEBUG] Nombre total de lignes trouvées: {total_rows}")
+
             snort_data = []
 
             for i, row in enumerate(rows):
-                if not self.running: break
+                if not self.running:
+                    break
+
                 date = row[0].strftime("%d/%m/%Y %H:%M:%S")
                 src, dst, attack, severity, engine = row[1], row[2], row[3], row[4], row[5]
-                if engine.lower() == "snort":
+
+                # CORRECTION ICI : Comparer avec "1" au lieu de "snort"
+                engine_str = str(engine).strip() if engine is not None else ""
+                print(f"[DEBUG] Ligne {i}: engine='{engine_str}' -> ", end="")
+                if engine_str == "1":  # '1' pour Snort
                     snort_data.append([date, src, dst, attack, severity])
-                if i % 100 == 0:
-                    self.progress_update.emit(int((i + 1) / total_rows * 100) if total_rows > 0 else 0)
+                    print(f"ajoutée (Snort)")
+                else:
+                    print(f"ignorée (engine={engine_str})")
+
+                if i % 100 == 0 and total_rows > 0:
+                    self.progress_update.emit(int((i + 1) / total_rows * 100))
 
             self.progress_update.emit(100)
+            print(f"[DEBUG] Total alertes Snort chargées: {len(snort_data)}")
             self.data_loaded.emit(snort_data)
 
         except psycopg2.OperationalError as e:
             self.error_occurred.emit(f"Erreur DB: {str(e)}")
         except Exception as e:
             self.error_occurred.emit(f"Erreur chargement: {str(e)}")
+            import traceback
+            traceback.print_exc()
         finally:
-            if 'cursor' in locals(): cursor.close()
-            if 'conn' in locals(): conn.close()
+            if 'cursor' in locals():
+                cursor.close()
+            if 'conn' in locals():
+                conn.close()
 
     def stop(self):
         self.running = False
@@ -183,10 +202,9 @@ class AlertInterface(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
-        main_layout.addStretch()
-        self.title = AnimatedLabel("🛡️ DÉTECTION SNORT - ALERTES RÉSEAU")
+        main_layout.setContentsMargins(20, 20, 20, 20)
+
+        self.title = AnimatedLabel("ALERTES RÉSEAU")
         self.title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(self.title)
 
@@ -325,13 +343,14 @@ class AlertInterface(QMainWindow):
                 try:
                     conn = psycopg2.connect(**DB_CONFIG)
                     cur = conn.cursor()
-                    cur.execute("SELECT DISTINCT attack_type::text FROM security_alerts ORDER BY attack_type")
+                    cur.execute("SELECT DISTINCT attack_type::text FROM alertes ORDER BY attack_type")
                     for row in cur.fetchall():
-                        if row[0]: types.append(str(row[0]))
+                        if row[0]:
+                            types.append(str(row[0]))
                     cur.close()
                     conn.close()
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"Erreur chargement types: {e}")
                 finally:
                     self.finished.emit(types)
 
@@ -509,14 +528,16 @@ class AlertInterface(QMainWindow):
         for row, row_data in enumerate(data):
             for col, value in enumerate(row_data):
                 item = QTableWidgetItem(str(value))
-                if col == 4:
+                if col == 4:  # Colonne Gravité
                     if value == "Élevée":
                         item.setBackground(QColor(COLORS['danger']))
+                        item.setForeground(QColor("white"))
                     elif value == "Moyenne":
                         item.setBackground(QColor(COLORS['warning']))
+                        item.setForeground(QColor("black"))
                     elif value == "Basse":
                         item.setBackground(QColor(COLORS['success']))
-                        item.setForeground(QColor(COLORS['bg_dark']))
+                        item.setForeground(QColor("black"))
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 table.setItem(row, col, item)
         table.setUpdatesEnabled(True)

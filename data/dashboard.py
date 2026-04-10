@@ -9,6 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from data.db_connection import connect_db
 
 
+
 class DatabaseManager:
     def __init__(self):
         self.connection = None
@@ -33,27 +34,32 @@ class DatabaseManager:
                 self.connect_db()
 
             cursor = self.connection.cursor()
-
+            if not self.connection or self.connection.closed:
+                self.connect_db()
             # Nombre total d'attaques
-            cursor.execute("SELECT COUNT(*) FROM security_alerts")
+            cursor.execute("SELECT COUNT(*) FROM alertes")
             total_attacks = cursor.fetchone()[0]
 
             # Attaques de la dernière heure
             one_hour_ago = datetime.now() - timedelta(hours=1)
+            if not self.connection or self.connection.closed:
+                self.connect_db()
             cursor.execute("""
-                SELECT COUNT(*) FROM security_alerts 
+                SELECT COUNT(*) FROM alertes 
                 WHERE timestamp >= %s
             """, (one_hour_ago,))
             last_hour_attacks = cursor.fetchone()[0]
-
+            if not self.connection or self.connection.closed:
+                self.connect_db()
             # Distribution par sévérité
             cursor.execute("""
                 SELECT severity, COUNT(*) 
-                FROM security_alerts 
+                FROM alertes 
                 GROUP BY severity
             """)
             severity_counts = dict(cursor.fetchall())
-
+            if not self.connection or self.connection.closed:
+                self.connect_db()
             cursor.close()
             return {
                 'total_attacks': total_attacks,
@@ -62,20 +68,19 @@ class DatabaseManager:
             }
         except Exception as e:
             print(f"❌ Erreur lors de la récupération des statistiques: {e}")
-            return {
-                'total_attacks': 0,
-                'last_hour_attacks': 0,
-                'severity_counts': {'Élevée': 0, 'Moyenne': 0, 'Basse': 0}
-            }
+            import traceback
+            traceback.print_exc()
+            return None  # garder ancienne valeur
 
     def get_total_packets(self):
         """Simule ou récupère le nombre total de paquets analysés"""
         try:
             if not self.connection:
                 self.connect_db()
-
+            if not self.connection or self.connection.closed:
+                self.connect_db()
             cursor = self.connection.cursor()
-            cursor.execute("SELECT COUNT(*) FROM security_alerts")
+            cursor.execute("SELECT COUNT(*) FROM alertes")
             total = cursor.fetchone()[0]
             cursor.close()
             if total == 0:
@@ -93,7 +98,7 @@ class DatabaseManager:
 
             cursor = self.connection.cursor()
 
-            cursor.execute("SELECT COUNT(*) FROM security_alerts")
+            cursor.execute("SELECT COUNT(*) FROM alertes")
             total_alerts = cursor.fetchone()[0]
 
             if total_alerts == 0:
@@ -103,7 +108,7 @@ class DatabaseManager:
             last_24h = datetime.now() - timedelta(hours=24)
             cursor.execute("""
                 SELECT severity, COUNT(*) 
-                FROM security_alerts 
+                FROM alertes 
                 WHERE timestamp >= %s
                 GROUP BY severity
             """, (last_24h,))
@@ -119,7 +124,7 @@ class DatabaseManager:
 
             if total_alerts_recent > 0:
                 risk_score = (
-                                     severity_data.get('Élevée', 0) * 3 +
+                                     severity_data.get('élevée', 0) * 3 +
                                      severity_data.get('Moyenne', 0) * 2 +
                                      severity_data.get('Basse', 0) * 1
                              ) / (total_alerts_recent * 3) * 100
@@ -142,7 +147,7 @@ class DatabaseManager:
 
             cursor.execute("""
                 SELECT EXTRACT(HOUR FROM timestamp) as hour, COUNT(*)
-                FROM security_alerts
+                FROM alertes
                 WHERE timestamp >= %s
                 GROUP BY EXTRACT(HOUR FROM timestamp)
                 ORDER BY hour

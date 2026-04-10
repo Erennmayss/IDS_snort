@@ -32,7 +32,7 @@ class RapportInterface(QMainWindow):
             'port': os.getenv('DB_PORT', '5432'),
             'database': os.getenv('DB_NAME', 'ids_db'),
             'user': os.getenv('DB_USER', 'marwa'),
-            'password': os.getenv('marwa', 'marwa')
+            'password': os.getenv('DB_PASSWORD', 'marwa')
         }
 
         # Taille de la fenêtre
@@ -86,15 +86,15 @@ class RapportInterface(QMainWindow):
         try:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-            # Récupérer tous les mois disponibles dans la base
+            # Récupérer tous les mois disponibles dans la base (table alertes)
             cursor.execute("""
                 SELECT 
                     TO_CHAR(timestamp, 'YYYY-MM') as mois,
                     COUNT(*) as total_attaques,
-                    SUM(CASE WHEN attack_type = 'DoS' THEN 1 ELSE 0 END) as dos_count,
-                    SUM(CASE WHEN attack_type = 'Scan Port' THEN 1 ELSE 0 END) as scans_count,
-                    SUM(CASE WHEN attack_type = 'Brute Force' THEN 1 ELSE 0 END) as brute_force_count
-                FROM security_alerts
+                    SUM(CASE WHEN attack_type = 'DoS' OR attack_type ILIKE '%DoS%' THEN 1 ELSE 0 END) as dos_count,
+                    SUM(CASE WHEN attack_type = 'Scan Port' OR attack_type ILIKE '%scan%' THEN 1 ELSE 0 END) as scans_count,
+                    SUM(CASE WHEN attack_type = 'Brute Force' OR attack_type ILIKE '%brute%' THEN 1 ELSE 0 END) as brute_force_count
+                FROM alertes
                 GROUP BY TO_CHAR(timestamp, 'YYYY-MM')
                 ORDER BY mois
             """)
@@ -111,8 +111,14 @@ class RapportInterface(QMainWindow):
                         timestamp::date as date,
                         attack_type as type,
                         source_ip as source,
-                        severity as severite
-                    FROM security_alerts
+                        severity as severite,
+                        destination_ip,
+                        protocol,
+                        source_port,
+                        destination_port,
+                        detection_engine,
+                        details as description
+                    FROM alertes
                     WHERE TO_CHAR(timestamp, 'YYYY-MM') = %s
                     ORDER BY timestamp DESC
                 """, (stat['mois'],))
@@ -427,15 +433,17 @@ class RapportInterface(QMainWindow):
         # Tableau des détails
         self.details_table = QTableWidget()
         self.details_table.setAlternatingRowColors(True)
-        self.details_table.setColumnCount(4)
-        self.details_table.setHorizontalHeaderLabels(["Date", "Type d'attaque", "Source", "Sévérité"])
+        self.details_table.setColumnCount(5)  # Augmenté à 5 colonnes
+        self.details_table.setHorizontalHeaderLabels(
+            ["Date", "Type d'attaque", "Source IP", "Destination IP", "Sévérité"])
 
         # Ajustement des colonnes
         header = self.details_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
 
         table_layout.addWidget(self.details_table)
         layout.addWidget(table_group)
@@ -448,7 +456,7 @@ class RapportInterface(QMainWindow):
         toolbar_layout = QHBoxLayout(toolbar_frame)
 
         # Statistiques supplémentaires
-        self.stats_label = QLabel("⚡ Données chargées depuis PostgreSQL")
+        self.stats_label = QLabel("⚡ Données chargées depuis PostgreSQL (table: alertes)")
         self.stats_label.setStyleSheet(f"color: {self.colors['info']}; font-size: 12px;")
         toolbar_layout.addWidget(self.stats_label)
 
@@ -480,16 +488,21 @@ class RapportInterface(QMainWindow):
                 self.details_table.setItem(i, 1, QTableWidgetItem(detail['type']))
                 self.details_table.setItem(i, 2, QTableWidgetItem(detail['source']))
 
+                # Ajouter la destination IP
+                dest_ip = detail.get('destination_ip', 'N/A')
+                self.details_table.setItem(i, 3, QTableWidgetItem(dest_ip))
+
                 # Coloration selon la sévérité
                 severite_item = QTableWidgetItem(detail['severite'])
-                if detail['severite'].lower() == 'haute' or detail['severite'].lower() == 'high':
-                    severite_item.setBackground(QBrush(QColor(239, 68, 68, 100))) # Rouge vif
+                if detail['severite'].lower() == 'haute' or detail['severite'].lower() == 'high' or detail[
+                    'severite'].lower() == 'critical':
+                    severite_item.setBackground(QBrush(QColor(239, 68, 68, 100)))  # Rouge vif
                 elif detail['severite'].lower() == 'moyenne' or detail['severite'].lower() == 'medium':
-                    severite_item.setBackground(QBrush(QColor(245, 158, 11, 100))) # Ambre
+                    severite_item.setBackground(QBrush(QColor(245, 158, 11, 100)))  # Ambre
                 else:
-                    severite_item.setBackground(QBrush(QColor(16, 185, 129, 100))) # Vert
+                    severite_item.setBackground(QBrush(QColor(16, 185, 129, 100)))  # Vert
 
-                self.details_table.setItem(i, 3, severite_item)
+                self.details_table.setItem(i, 4, severite_item)
 
             # Mise à jour du label
             self.stats_label.setText(f"Rapport annuel chargé - {len(tous_les_details)} événements détaillés")
@@ -511,16 +524,21 @@ class RapportInterface(QMainWindow):
                 self.details_table.setItem(i, 1, QTableWidgetItem(detail['type']))
                 self.details_table.setItem(i, 2, QTableWidgetItem(detail['source']))
 
+                # Ajouter la destination IP
+                dest_ip = detail.get('destination_ip', 'N/A')
+                self.details_table.setItem(i, 3, QTableWidgetItem(dest_ip))
+
                 # Coloration selon la sévérité
                 severite_item = QTableWidgetItem(detail['severite'])
-                if detail['severite'].lower() == 'haute' or detail['severite'].lower() == 'high':
+                if detail['severite'].lower() == 'haute' or detail['severite'].lower() == 'high' or detail[
+                    'severite'].lower() == 'critical':
                     severite_item.setBackground(QBrush(QColor(239, 68, 68, 100)))
                 elif detail['severite'].lower() == 'moyenne' or detail['severite'].lower() == 'medium':
                     severite_item.setBackground(QBrush(QColor(245, 158, 11, 100)))
                 else:
                     severite_item.setBackground(QBrush(QColor(16, 185, 129, 100)))
 
-                self.details_table.setItem(i, 3, severite_item)
+                self.details_table.setItem(i, 4, severite_item)
 
             # Mise à jour du label
             self.stats_label.setText(f" Rapport {mois.capitalize()} chargé - {len(details)} événements détaillés")
@@ -648,14 +666,19 @@ class RapportInterface(QMainWindow):
                 ip_stats[ip] = {
                     'total': 0,
                     'types': {},
-                    'severites': {'Haute': 0, 'Moyenne': 0, 'Basse': 0}
+                    'severites': {'Haute': 0, 'Moyenne': 0, 'Basse': 0},
+                    'destinations': {}
                 }
             ip_stats[ip]['total'] += 1
             ip_stats[ip]['types'][detail['type']] = ip_stats[ip]['types'].get(detail['type'], 0) + 1
 
+            # Ajouter les destinations
+            dest = detail.get('destination_ip', 'N/A')
+            ip_stats[ip]['destinations'][dest] = ip_stats[ip]['destinations'].get(dest, 0) + 1
+
             # Compter par sévérité
             sev = detail['severite'].capitalize()
-            if 'Haute' in sev or 'High' in sev:
+            if 'Haute' in sev or 'High' in sev or 'Critical' in sev:
                 ip_stats[ip]['severites']['Haute'] += 1
             elif 'Moyenne' in sev or 'Medium' in sev:
                 ip_stats[ip]['severites']['Moyenne'] += 1
@@ -663,13 +686,19 @@ class RapportInterface(QMainWindow):
                 ip_stats[ip]['severites']['Basse'] += 1
 
         # Tableau des statistiques par IP
-        ip_data = [['Adresse IP', 'Total', 'Haute', 'Moyenne', 'Basse', 'Types d\'attaques']]
+        ip_data = [['Adresse IP', 'Total', 'Haute', 'Moyenne', 'Basse', 'Types d\'attaques', 'Destinations']]
         for ip, stats in ip_stats.items():
-            # Formater les types d'attaques sur plusieurs lignes si nécessaire
+            # Formater les types d'attaques
             types_list = []
             for t, c in stats['types'].items():
                 types_list.append(f"{t}:{c}")
-            types_str = '\n'.join(types_list)  # Utiliser des sauts de ligne
+            types_str = '\n'.join(types_list)
+
+            # Formater les destinations
+            dest_list = []
+            for d, c in stats['destinations'].items():
+                dest_list.append(f"{d}:{c}")
+            dest_str = '\n'.join(dest_list)
 
             ip_data.append([
                 ip,
@@ -677,11 +706,13 @@ class RapportInterface(QMainWindow):
                 str(stats['severites']['Haute']),
                 str(stats['severites']['Moyenne']),
                 str(stats['severites']['Basse']),
-                types_str
+                types_str,
+                dest_str
             ])
 
-        # Ajuster les largeurs pour que tout tienne dans les cases
-        ip_table = Table(ip_data, colWidths=[1.2 * inch, 0.5 * inch, 0.5 * inch, 0.6 * inch, 0.5 * inch, 2.5 * inch])
+        # Ajuster les largeurs
+        ip_table = Table(ip_data,
+                         colWidths=[1.2 * inch, 0.5 * inch, 0.5 * inch, 0.6 * inch, 0.5 * inch, 1.8 * inch, 1.5 * inch])
         ip_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E293B')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -696,7 +727,7 @@ class RapportInterface(QMainWindow):
             ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
             ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#334155')),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#FFFFFF'), colors.HexColor('#F8FAFC')]),
-            ('WORDWRAP', (5, 1), (5, -1), True)  # Activer le retour à la ligne pour la colonne des types
+            ('WORDWRAP', (5, 1), (6, -1), True)
         ]))
         story.append(ip_table)
         story.append(Spacer(1, 0.3 * inch))
@@ -706,21 +737,27 @@ class RapportInterface(QMainWindow):
 
         if donnees['details']:
             # En-têtes du tableau détaillé
-            details_data = [['Date', 'Type', 'Source', 'Sévérité']]
+            details_data = [['Date', 'Type', 'Source IP', 'Destination IP', 'Sévérité', 'Protocole', 'Ports']]
 
             # Ajout des données
             for detail in donnees['details']:
                 date_str = detail['date'].strftime('%Y-%m-%d') if hasattr(detail['date'], 'strftime') else str(
                     detail['date'])
+                ports = f"{detail.get('source_port', 'N/A')}→{detail.get('destination_port', 'N/A')}"
                 details_data.append([
                     date_str,
                     detail['type'],
                     detail['source'],
-                    detail['severite']
+                    detail.get('destination_ip', 'N/A'),
+                    detail['severite'],
+                    detail.get('protocol', 'N/A'),
+                    ports
                 ])
 
-            # Création du tableau détaillé - Largeurs ajustées
-            details_table = Table(details_data, colWidths=[0.9 * inch, 1.8 * inch, 1.8 * inch, 0.8 * inch])
+            # Création du tableau détaillé
+            details_table = Table(details_data,
+                                  colWidths=[0.8 * inch, 1.5 * inch, 1.2 * inch, 1.2 * inch, 0.8 * inch, 0.6 * inch,
+                                             0.8 * inch])
 
             # Style du tableau détaillé
             table_style = [
@@ -728,11 +765,11 @@ class RapportInterface(QMainWindow):
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
                 ('ALIGN', (0, 1), (0, -1), 'CENTER'),
-                ('ALIGN', (3, 1), (3, -1), 'CENTER'),
+                ('ALIGN', (4, 1), (6, -1), 'CENTER'),
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 11),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
                 ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
                 ('TOPPADDING', (0, 1), (-1, -1), 5),
                 ('BOTTOMPADDING', (0, 1), (-1, -1), 5),
@@ -742,15 +779,15 @@ class RapportInterface(QMainWindow):
 
             # Coloration selon la sévérité
             for i, detail in enumerate(donnees['details'], start=1):
-                if detail['severite'].lower() in ['haute', 'high']:
-                    table_style.append(('BACKGROUND', (3, i), (3, i), colors.HexColor('#FEE2E2')))
-                    table_style.append(('TEXTCOLOR', (3, i), (3, i), colors.HexColor('#991B1B')))
+                if detail['severite'].lower() in ['haute', 'high', 'critical']:
+                    table_style.append(('BACKGROUND', (4, i), (4, i), colors.HexColor('#FEE2E2')))
+                    table_style.append(('TEXTCOLOR', (4, i), (4, i), colors.HexColor('#991B1B')))
                 elif detail['severite'].lower() in ['moyenne', 'medium']:
-                    table_style.append(('BACKGROUND', (3, i), (3, i), colors.HexColor('#FEF3C7')))
-                    table_style.append(('TEXTCOLOR', (3, i), (3, i), colors.HexColor('#92400E')))
+                    table_style.append(('BACKGROUND', (4, i), (4, i), colors.HexColor('#FEF3C7')))
+                    table_style.append(('TEXTCOLOR', (4, i), (4, i), colors.HexColor('#92400E')))
                 else:
-                    table_style.append(('BACKGROUND', (3, i), (3, i), colors.HexColor('#D1FAE5')))
-                    table_style.append(('TEXTCOLOR', (3, i), (3, i), colors.HexColor('#065F46')))
+                    table_style.append(('BACKGROUND', (4, i), (4, i), colors.HexColor('#D1FAE5')))
+                    table_style.append(('TEXTCOLOR', (4, i), (4, i), colors.HexColor('#065F46')))
 
             details_table.setStyle(TableStyle(table_style))
             story.append(details_table)
@@ -767,7 +804,7 @@ class RapportInterface(QMainWindow):
             alignment=1,
             fontName='Helvetica-Oblique'
         )
-        footer_text = "Rapport généré automatiquement - Console SOC"
+        footer_text = "Rapport généré automatiquement - Console SOC (table: alertes)"
         story.append(Paragraph(footer_text, footer_style))
 
         # Génération du PDF
@@ -868,15 +905,19 @@ class RapportInterface(QMainWindow):
                     'total': 0,
                     'types': {},
                     'severites': {'Haute': 0, 'Moyenne': 0, 'Basse': 0},
-                    'mois': set()
+                    'mois': set(),
+                    'destinations': {}
                 }
             ip_stats_annuels[ip]['total'] += 1
             ip_stats_annuels[ip]['types'][detail['type']] = ip_stats_annuels[ip]['types'].get(detail['type'], 0) + 1
             ip_stats_annuels[ip]['mois'].add(detail['mois'])
 
+            dest = detail.get('destination_ip', 'N/A')
+            ip_stats_annuels[ip]['destinations'][dest] = ip_stats_annuels[ip]['destinations'].get(dest, 0) + 1
+
             # Compter par sévérité
             sev = detail['severite'].capitalize()
-            if 'Haute' in sev or 'High' in sev:
+            if 'Haute' in sev or 'High' in sev or 'Critical' in sev:
                 ip_stats_annuels[ip]['severites']['Haute'] += 1
             elif 'Moyenne' in sev or 'Medium' in sev:
                 ip_stats_annuels[ip]['severites']['Moyenne'] += 1
@@ -884,15 +925,22 @@ class RapportInterface(QMainWindow):
                 ip_stats_annuels[ip]['severites']['Basse'] += 1
 
         # Tableau des statistiques par IP
-        ip_data = [['Adresse IP', 'Total', 'Haute', 'Moy.', 'Basse', 'Mois actifs', 'Types d\'attaques']]
+        ip_data = [
+            ['Adresse IP', 'Total', 'Haute', 'Moy.', 'Basse', 'Mois actifs', 'Types d\'attaques', 'Destinations']]
         for ip, stats in sorted(ip_stats_annuels.items(), key=lambda x: x[1]['total'], reverse=True):
             mois_str = ', '.join(sorted([m[:3] for m in stats['mois']]))
 
-            # Formater les types d'attaques sur plusieurs lignes
+            # Formater les types d'attaques
             types_list = []
             for t, c in sorted(stats['types'].items()):
                 types_list.append(f"{t}:{c}")
-            types_str = '\n'.join(types_list)  # Utiliser des sauts de ligne
+            types_str = '\n'.join(types_list)
+
+            # Formater les destinations
+            dest_list = []
+            for d, c in stats['destinations'].items():
+                dest_list.append(f"{d}:{c}")
+            dest_str = '\n'.join(dest_list)
 
             ip_data.append([
                 ip,
@@ -901,12 +949,14 @@ class RapportInterface(QMainWindow):
                 str(stats['severites']['Moyenne']),
                 str(stats['severites']['Basse']),
                 mois_str,
-                types_str
+                types_str,
+                dest_str
             ])
 
-        # Ajuster les largeurs pour que tout tienne dans les cases
+        # Ajuster les largeurs
         ip_table = Table(ip_data,
-                         colWidths=[1.1 * inch, 0.4 * inch, 0.4 * inch, 0.4 * inch, 0.4 * inch, 0.8 * inch, 2.5 * inch])
+                         colWidths=[1.0 * inch, 0.4 * inch, 0.4 * inch, 0.4 * inch, 0.4 * inch, 0.6 * inch, 1.5 * inch,
+                                    1.3 * inch])
         ip_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E293B')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -915,14 +965,14 @@ class RapportInterface(QMainWindow):
             ('ALIGN', (5, 1), (5, -1), 'CENTER'),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 9),
-            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('FONTSIZE', (0, 0), (-1, 0), 8),
+            ('FONTSIZE', (0, 1), (-1, -1), 7),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
             ('TOPPADDING', (0, 1), (-1, -1), 3),
             ('BOTTOMPADDING', (0, 1), (-1, -1), 3),
             ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#334155')),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#FFFFFF'), colors.HexColor('#F8FAFC')]),
-            ('WORDWRAP', (6, 1), (6, -1), True)  # Activer le retour à la ligne pour la colonne des types
+            ('WORDWRAP', (6, 1), (7, -1), True)
         ]))
         story.append(ip_table)
         story.append(Spacer(1, 0.3 * inch))
@@ -932,7 +982,7 @@ class RapportInterface(QMainWindow):
 
         if tous_les_details:
             # Limiter à 50 événements pour éviter un PDF trop long
-            details_a_afficher = tous_les_details[0:]
+            details_a_afficher = tous_les_details[:50]
             if len(tous_les_details) > 50:
                 story.append(
                     Paragraph(f"Affichage des 50 événements les plus récents sur {len(tous_les_details)} au total",
@@ -941,22 +991,28 @@ class RapportInterface(QMainWindow):
                 story.append(Spacer(1, 0.1 * inch))
 
             # En-têtes du tableau détaillé
-            details_data = [['Date', 'Mois', 'Type', 'Source', 'Sévérité']]
+            details_data = [['Date', 'Mois', 'Type', 'Source IP', 'Destination IP', 'Sévérité', 'Protocole', 'Ports']]
 
             # Ajout des données
             for detail in details_a_afficher:
                 date_str = detail['date'].strftime('%Y-%m-%d') if hasattr(detail['date'], 'strftime') else str(
                     detail['date'])
+                ports = f"{detail.get('source_port', 'N/A')}→{detail.get('destination_port', 'N/A')}"
                 details_data.append([
                     date_str,
                     detail['mois'].capitalize()[:3],
                     detail['type'],
                     detail['source'],
-                    detail['severite']
+                    detail.get('destination_ip', 'N/A'),
+                    detail['severite'],
+                    detail.get('protocol', 'N/A'),
+                    ports
                 ])
 
-            # Création du tableau détaillé - Largeur augmentée pour la colonne Type
-            details_table = Table(details_data, colWidths=[0.7 * inch, 0.4 * inch, 2.5 * inch, 1.3 * inch, 0.7 * inch])
+            # Création du tableau détaillé
+            details_table = Table(details_data,
+                                  colWidths=[0.6 * inch, 0.4 * inch, 1.3 * inch, 0.9 * inch, 0.9 * inch, 0.6 * inch,
+                                             0.5 * inch, 0.6 * inch])
 
             # Style du tableau détaillé
             table_style = [
@@ -964,30 +1020,30 @@ class RapportInterface(QMainWindow):
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
                 ('ALIGN', (0, 1), (1, -1), 'CENTER'),
-                ('ALIGN', (4, 1), (4, -1), 'CENTER'),
+                ('ALIGN', (5, 1), (7, -1), 'CENTER'),
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                ('FONTSIZE', (0, 0), (-1, 0), 8),
+                ('FONTSIZE', (0, 1), (-1, -1), 7),
                 ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
                 ('TOPPADDING', (0, 1), (-1, -1), 3),
                 ('BOTTOMPADDING', (0, 1), (-1, -1), 3),
                 ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#334155')),
                 ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#FFFFFF'), colors.HexColor('#F8FAFC')]),
-                ('WORDWRAP', (2, 1), (2, -1), True)  # Ajout du WORDWRAP pour la colonne Type (index 2)
+                ('WORDWRAP', (2, 1), (7, -1), True)
             ]
 
             # Coloration selon la sévérité
             for i, detail in enumerate(details_a_afficher, start=1):
-                if detail['severite'].lower() in ['haute', 'high']:
-                    table_style.append(('BACKGROUND', (4, i), (4, i), colors.HexColor('#FEE2E2')))
-                    table_style.append(('TEXTCOLOR', (4, i), (4, i), colors.HexColor('#991B1B')))
+                if detail['severite'].lower() in ['haute', 'high', 'critical']:
+                    table_style.append(('BACKGROUND', (5, i), (5, i), colors.HexColor('#FEE2E2')))
+                    table_style.append(('TEXTCOLOR', (5, i), (5, i), colors.HexColor('#991B1B')))
                 elif detail['severite'].lower() in ['moyenne', 'medium']:
-                    table_style.append(('BACKGROUND', (4, i), (4, i), colors.HexColor('#FEF3C7')))
-                    table_style.append(('TEXTCOLOR', (4, i), (4, i), colors.HexColor('#92400E')))
+                    table_style.append(('BACKGROUND', (5, i), (5, i), colors.HexColor('#FEF3C7')))
+                    table_style.append(('TEXTCOLOR', (5, i), (5, i), colors.HexColor('#92400E')))
                 else:
-                    table_style.append(('BACKGROUND', (4, i), (4, i), colors.HexColor('#D1FAE5')))
-                    table_style.append(('TEXTCOLOR', (4, i), (4, i), colors.HexColor('#065F46')))
+                    table_style.append(('BACKGROUND', (5, i), (5, i), colors.HexColor('#D1FAE5')))
+                    table_style.append(('TEXTCOLOR', (5, i), (5, i), colors.HexColor('#065F46')))
 
             details_table.setStyle(TableStyle(table_style))
             story.append(details_table)
@@ -1004,7 +1060,7 @@ class RapportInterface(QMainWindow):
             alignment=1,
             fontName='Helvetica-Oblique'
         )
-        footer_text = "Rapport annuel généré automatiquement - Console SOC"
+        footer_text = "Rapport annuel généré automatiquement - Console SOC (table: alertes)"
         story.append(Paragraph(footer_text, footer_style))
 
         # Génération du PDF

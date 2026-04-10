@@ -29,6 +29,7 @@ class TrafficHistogram(FigureCanvas):
         self.fig = Figure(figsize=(5.5, 3.2), dpi=100)
         self.ax = self.fig.add_subplot(111)
         super().__init__(self.fig)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         self.ax.set_facecolor(COLORS['bg_dark'])
         self.fig.patch.set_facecolor(COLORS['bg_dark'])
@@ -113,13 +114,15 @@ class SimplePage(QWidget):
         """)
 
         main_layout_global = QVBoxLayout(self)
-        main_layout_global.setContentsMargins(10, 10, 10, 10)
+        main_layout_global.setContentsMargins(0, 0, 0, 0)
+        main_layout_global.setSpacing(0)
         main_layout_global.addWidget(self.cadre)
+        main_layout_global.addStretch()
 
         main_layout = QVBoxLayout(self.cadre)
         main_layout.setSpacing(15)
 
-        self.title = AnimatedLabel("TABLEAU DE BORD - SYSTÈME DE DÉTECTION D'INTRUSION")
+        self.title = AnimatedLabel("TABLEAU DE BORD ")
         self.title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(self.title)
 

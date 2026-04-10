@@ -54,6 +54,7 @@ class PredictionWorker(QThread):
         self.scaler   = scaler
         self.encoder  = encoder
         self.features = features
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
     def run(self):
         try:
@@ -154,8 +155,9 @@ class MetricCard(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, False)
 
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(16, 10, 16, 10)
-        lay.setSpacing(3)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(0)
+        lay.addStretch()
 
         top = QHBoxLayout(); top.setSpacing(6)
         self._icon = QLabel(icon)

@@ -52,7 +52,7 @@ def get_snort_alerts(filters=None):
             query = """
             SELECT timestamp, source_ip, destination_ip, attack_type, severity
             FROM security_alerts
-            WHERE detection_engine = 'snort'
+            WHERE detection_engine = 'Snort'
             """
             params = []
 
@@ -113,7 +113,7 @@ def get_snort_alerts_count(filters=None):
             query = """
             SELECT COUNT(*)
             FROM security_alerts
-            WHERE detection_engine = 'snort'
+            WHERE detection_engine = 'Snort'
             """
             params = []
 
@@ -207,7 +207,7 @@ def get_all_alerts(filters=None):
 
                 if engine and engine.lower() == "ml":
                     ml_data.append(alert)
-                elif engine and engine.lower() == "snort":
+                elif engine and engine.lower() == "Snort":
                     snort_data.append(alert)
 
             return ml_data, snort_data
@@ -232,7 +232,7 @@ def get_alerts_by_severity(filters=None):
             query = """
             SELECT severity, COUNT(*)
             FROM security_alerts
-            WHERE detection_engine = 'snort'
+            WHERE detection_engine = 'Snort'
             """
             params = []
 
@@ -280,7 +280,7 @@ def get_recent_snort_alerts(limit=50):
             cursor.execute("""
                 SELECT timestamp, source_ip, destination_ip, attack_type, severity
                 FROM security_alerts
-                WHERE detection_engine = 'snort'
+                WHERE detection_engine = 'Snort'
                 ORDER BY timestamp DESC
                 LIMIT %s
             """, (limit,))
@@ -316,7 +316,7 @@ def get_snort_alerts_by_ip(ip, limit=100):
             cursor.execute("""
                 SELECT timestamp, source_ip, destination_ip, attack_type, severity
                 FROM security_alerts
-                WHERE detection_engine = 'snort'
+                WHERE detection_engine = 'Snort'
                 AND (source_ip = %s OR destination_ip = %s)
                 ORDER BY timestamp DESC
                 LIMIT %s
@@ -353,7 +353,7 @@ def get_snort_alerts_by_date_range(start_date, end_date):
             cursor.execute("""
                 SELECT timestamp, source_ip, destination_ip, attack_type, severity
                 FROM security_alerts
-                WHERE detection_engine = 'snort'
+                WHERE detection_engine = 'Snort'
                 AND DATE(timestamp) BETWEEN %s AND %s
                 ORDER BY timestamp DESC
             """, (start_date, end_date))
@@ -384,7 +384,7 @@ def get_top_attack_types_snort(limit=5):
             cursor.execute("""
                 SELECT attack_type, COUNT(*) as count
                 FROM security_alerts
-                WHERE detection_engine = 'snort'
+                WHERE detection_engine = 'Snort'
                 GROUP BY attack_type
                 ORDER BY count DESC
                 LIMIT %s
@@ -411,7 +411,7 @@ def get_top_source_ips_snort(limit=5):
             cursor.execute("""
                 SELECT source_ip, COUNT(*) as count
                 FROM security_alerts
-                WHERE detection_engine = 'snort'
+                WHERE detection_engine = 'Snort'
                 GROUP BY source_ip
                 ORDER BY count DESC
                 LIMIT %s

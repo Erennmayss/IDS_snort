@@ -47,28 +47,27 @@ class NavButton(QPushButton):
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("IDS SENTINEL")
+        self.setWindowTitle("IDS-Snort")
         self.is_collapsed = False
 
-        # Correction du décalage : On utilise showMaximized() à la fin au lieu de setGeometry
         self.setStyleSheet(f"background-color: {COLORS['bg_dark']};")
 
         self.main_layout = QHBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(0)
 
-        # Dictionnaire pour stocker les instances des pages (Chargement à la demande)
         self.page_instances = {}
 
         self.setup_sidebar()
 
-        # Zone de contenu
         self.stack = QStackedWidget()
         self.main_layout.addWidget(self.sidebar)
         self.main_layout.addWidget(self.stack, 1)
+        self.stack.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
-        # Charger la première page (Dashboard)
         self.switch_page(0)
+        self.setLayout(self.main_layout)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
     def setup_sidebar(self):
         self.sidebar = QFrame()
@@ -80,16 +79,19 @@ class MainWindow(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Logo
-        logo = QLabel("🛡️ SENTINEL")
-        logo.setFixedHeight(80)
-        logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        logo.setStyleSheet(
-            f"color: {COLORS['info']}; font-weight: 900; font-size: 18px; border-bottom: 1px solid #334155;")
-        layout.addWidget(logo)
+        # Logo - Version simplifiée avec un seul label qui change de texte
+        self.logo_label = QLabel("🛡️ Snort & ML IDS")
+        self.logo_label.setFixedHeight(80)
+        self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.logo_label.setStyleSheet(
+            f"color: {COLORS['info']}; font-weight: 900; font-size: 16px; "
+            f"background: transparent; font-family: 'Segoe UI', monospace; "
+            f"border-bottom: 1px solid #334155;"
+        )
+        layout.addWidget(self.logo_label)
         layout.addSpacing(10)
 
-        # Boutons
+        # Boutons de navigation
         self.nav_buttons = []
         menus = [("Dashboard", "📊"), ("Alertes", "⚠️"), ("Analyse", "📈"),
                  ("Intelligence", "🤖"), ("Paramètres", "⚙️"), ("Rapports", "📄")]
@@ -103,14 +105,25 @@ class MainWindow(QWidget):
         layout.addStretch()
 
         # Bouton Toggle
-        self.toggle_btn = QPushButton("⇇")
+        self.toggle_btn = QPushButton("◀")
         self.toggle_btn.setFixedHeight(40)
-        self.toggle_btn.setStyleSheet("color: #8899AA; border: none; border-top: 1px solid #334155;")
+        self.toggle_btn.setStyleSheet("""
+            QPushButton {
+                color: #8899AA;
+                border: none;
+                border-top: 1px solid #334155;
+                font-size: 14px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #334155;
+                color: white;
+            }
+        """)
         self.toggle_btn.clicked.connect(self.toggle_sidebar)
         layout.addWidget(self.toggle_btn)
 
     def switch_page(self, index):
-        """Charge la page uniquement au moment où on clique dessus"""
         if index not in self.page_instances:
             self.create_page(index)
 
@@ -119,7 +132,6 @@ class MainWindow(QWidget):
             btn.setChecked(i == index)
 
     def create_page(self, index):
-        """Instanciation dynamique pour éviter la lourdeur au démarrage"""
         try:
             if index == 0:
                 from gui.dashboard import SimplePage
@@ -130,15 +142,20 @@ class MainWindow(QWidget):
             elif index == 2:
                 from gui.traficreseaux import TrafficAnalyzerInterface
                 widget = TrafficAnalyzerInterface()
-            elif index == 3:  # <--- AJOUT DU MACHINE LEARNING ICI
+            elif index == 3:
                 from gui.ML import IDSWindow
                 widget = IDSWindow()
             elif index == 4:
                 from gui.configuration import InterfaceParametresIDS
                 widget = InterfaceParametresIDS()
+            elif index == 5:
+                from gui.Rapport import RapportInterface
+                widget = RapportInterface()
             else:
-                widget = QWidget()  # Page vide par défaut
+                widget = QWidget()
 
+            widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            widget.setMinimumSize(0, 0)
             self.page_instances[index] = widget
             self.stack.addWidget(widget)
         except Exception as e:
@@ -149,14 +166,36 @@ class MainWindow(QWidget):
         new_width = 70 if width > 100 else 220
         self.is_collapsed = (new_width == 70)
 
+        # Animation de la sidebar
+        self.sidebar.setMaximumWidth(16777215)
         self.anim = QPropertyAnimation(self.sidebar, b"minimumWidth")
         self.anim.setDuration(250)
         self.anim.setStartValue(width)
         self.anim.setEndValue(new_width)
         self.anim.setEasingCurve(QEasingCurve.Type.OutQuad)
         self.anim.start()
-
         self.sidebar.setMaximumWidth(new_width)
+
+        # Changer le texte du logo
+        if self.is_collapsed:
+            self.logo_label.setText("🛡️")
+            self.logo_label.setStyleSheet(
+                f"color: {COLORS['info']}; font-weight: 900; font-size: 28px; "
+                f"background: transparent; border-bottom: 1px solid #334155;"
+            )
+            self.toggle_btn.setText("▶")
+            self.toggle_btn.setToolTip("Développer le menu")
+        else:
+            self.logo_label.setText("🛡️ Snort & ML IDS")
+            self.logo_label.setStyleSheet(
+                f"color: {COLORS['info']}; font-weight: 900; font-size: 16px; "
+                f"background: transparent; font-family: 'Segoe UI', monospace; "
+                f"border-bottom: 1px solid #334155;"
+            )
+            self.toggle_btn.setText("◀")
+            self.toggle_btn.setToolTip("Réduire le menu")
+
+        # Mise à jour des boutons de navigation
         for btn in self.nav_buttons:
             btn.update_style(self.is_collapsed)
 
@@ -164,5 +203,5 @@ class MainWindow(QWidget):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
-    window.showMaximized()  # Correction du décalage : on laisse Windows gérer la taille
+    window.showMaximized()
     sys.exit(app.exec())

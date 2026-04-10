@@ -3,7 +3,7 @@ import psycopg2
 def connect_db():
     try:
         conn = psycopg2.connect(
-            host="localhost",  # Changé de 192.168.1.2 à localhost
+            host="192.168.1.2",  # Changé de 192.168.1.2 à localhost
             database="ids_db",
             user="aya",
             password="aya",

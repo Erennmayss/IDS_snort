@@ -8,12 +8,13 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QLabel,
     QFrame, QGridLayout, QGraphicsOpacityEffect,
-    QHBoxLayout, QSizePolicy
+    QHBoxLayout, QSizePolicy, QPushButton
 )
 from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup, QTimer
 from PyQt6.QtGui import QPalette, QColor
 
 import matplotlib
+
 matplotlib.use("QtAgg")
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -22,6 +23,7 @@ from matplotlib.figure import Figure
 from config import COLORS
 from gui.components import AnimatedLabel, FocusableFrame
 from data.dashboard import DatabaseManager
+from snort_module.lancement import SnortManager  # ✅ Import du SnortManager
 
 
 class TrafficHistogram(FigureCanvas):
@@ -49,7 +51,7 @@ class TrafficHistogram(FigureCanvas):
         couleurs = [COLORS['success'] if val == 0 else COLORS['danger'] for val in data]
 
         bars = self.ax.bar(heures, data, color=couleurs, width=0.65,
-                          edgecolor='white', linewidth=0.5, alpha=0.9)
+                           edgecolor='white', linewidth=0.5, alpha=0.9)
 
         self.ax.set_title("ÉTAT DU TRAFIC - 24 DERNIÈRES HEURES",
                           color="white", fontsize=11, fontweight='bold', pad=8)
@@ -93,9 +95,11 @@ class SimplePage(QWidget):
     def __init__(self):
         super().__init__()
         self.db_manager = DatabaseManager()
+        self.snort = SnortManager()  # ✅ Initialisation de SnortManager
         self.attack_stats = {'total_attacks': 0, 'last_hour_attacks': 0, 'severity_counts': {}}
         self.total_packets = 0
         self.risk_level = 0
+        self.is_running = False  # Démarré à FALSE (arrêté par défaut)
 
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
@@ -104,10 +108,11 @@ class SimplePage(QWidget):
         palette.setColor(QPalette.ColorRole.Window, QColor(COLORS['bg_dark']))
         self.setPalette(palette)
 
+        # Cadre principal - BLEU FONCÉ
         self.cadre = QFrame()
         self.cadre.setStyleSheet(f"""
             QFrame {{
-                background-color: {COLORS['bg_medium']};
+                background-color: {COLORS['bg_dark']};
                 border-radius: 20px;
                 padding: 20px;
             }}
@@ -122,10 +127,41 @@ class SimplePage(QWidget):
         main_layout = QVBoxLayout(self.cadre)
         main_layout.setSpacing(15)
 
+        # === HEADER AVEC TITRE ET BOUTON START ===
+        header_layout = QHBoxLayout()
+        header_layout.setSpacing(15)
+
         self.title = AnimatedLabel("TABLEAU DE BORD ")
         self.title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(self.title)
+        header_layout.addWidget(self.title, 1)
 
+        # Bouton START/STOP
+        self.start_stop_btn = QPushButton("▶️ START")
+        self.start_stop_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.start_stop_btn.setFixedSize(100, 40)
+        self.start_stop_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['info']};
+                color: white;
+                border: none;
+                border-radius: 10px;
+                font-size: 14px;
+                font-weight: bold;
+                padding: 8px 16px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['info']}cc;
+            }}
+            QPushButton:pressed {{
+                background-color: {COLORS['info']}99;
+            }}
+        """)
+        self.start_stop_btn.clicked.connect(self.toggle_system)
+        header_layout.addWidget(self.start_stop_btn)
+
+        main_layout.addLayout(header_layout)
+
+        # Animation du titre
         self.opacity_effect = QGraphicsOpacityEffect()
         self.title.setGraphicsEffect(self.opacity_effect)
 
@@ -152,12 +188,14 @@ class SimplePage(QWidget):
         grid_layout = QGridLayout()
         grid_layout.setSpacing(15)
 
+        # Premier chargement des données (affichage initial)
         self.update_data_from_db()
 
         self.cadre1 = self.create_inner_frame("📊 NOMBRE TOTAL DE PAQUETS ANALYSÉS", self.format_packets_display())
         self.cadre2 = self.create_inner_frame("⚠️ NOMBRE D'ATTAQUES DÉTECTÉES", self.format_attacks_display())
         self.cadre3 = self.create_inner_frame("🎯 NIVEAU DE RISQUE GLOBAL", self.format_risk_display())
 
+        # Cadre pour l'histogramme
         self.cadre4 = FocusableFrame()
         self.cadre4.setStyleSheet(f"""
             QFrame {{
@@ -214,12 +252,110 @@ class SimplePage(QWidget):
 
         main_layout.addLayout(grid_layout)
 
+        # Chargement initial de l'histogramme
         hist_data = self.db_manager.get_attacks_last_24h()
         self.histogram.update_histogram(hist_data)
 
+        # Timer de mise à jour
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.refresh_dashboard)
-        self.update_timer.start(5000)
+        # ⚡ NE PAS démarrer le timer automatiquement
+
+    def toggle_system(self):
+        """Active ou désactive Snort et la mise à jour en temps réel"""
+        if self.is_running:
+            # === ARRÊTER LE SYSTÈME ===
+            # 1. Arrêter Snort
+            self.snort.stop_snort()
+
+            # 2. Arrêter le timer de mise à jour
+            self.update_timer.stop()
+
+            # 3. Mettre à jour l'état
+            self.is_running = False
+
+            # 4. Changer le bouton en START (bleu)
+            self.start_stop_btn.setText("▶️ START")
+            self.start_stop_btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {COLORS['info']};
+                    color: white;
+                    border: none;
+                    border-radius: 10px;
+                    font-size: 14px;
+                    font-weight: bold;
+                    padding: 8px 16px;
+                }}
+                QPushButton:hover {{
+                    background-color: {COLORS['info']}cc;
+                }}
+                QPushButton:pressed {{
+                    background-color: {COLORS['info']}99;
+                }}
+            """)
+            print("🛑 Snort ARRÊTÉ - Surveillance terminée")
+
+        else:
+            # === DÉMARRER LE SYSTÈME ===
+            # 1. Démarrer Snort
+            success = self.snort.start_snort()
+
+            if success:
+                # 2. Démarrer le timer de mise à jour
+                self.update_timer.start(5000)
+
+                # 3. Mettre à jour l'état
+                self.is_running = True
+
+                # 4. Changer le bouton en STOP (rouge)
+                self.start_stop_btn.setText("⏹️ STOP")
+                self.start_stop_btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: {COLORS['danger']};
+                        color: white;
+                        border: none;
+                        border-radius: 10px;
+                        font-size: 14px;
+                        font-weight: bold;
+                        padding: 8px 16px;
+                    }}
+                    QPushButton:hover {{
+                        background-color: {COLORS['danger']}cc;
+                    }}
+                    QPushButton:pressed {{
+                        background-color: {COLORS['danger']}99;
+                    }}
+                """)
+
+                # 5. Rafraîchir immédiatement les données
+                self.refresh_dashboard()
+                print("✅ Snort DÉMARRÉ - Surveillance active")
+            else:
+                # Si Snort n'a pas pu démarrer, afficher une erreur
+                self.start_stop_btn.setText("❌ ERREUR")
+                QTimer.singleShot(2000, self.reset_button_text)
+                print("❌ Erreur: Impossible de démarrer Snort")
+
+    def reset_button_text(self):
+        """Réinitialise le texte du bouton après une erreur"""
+        self.start_stop_btn.setText("▶️ START")
+        self.start_stop_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['info']};
+                color: white;
+                border: none;
+                border-radius: 10px;
+                font-size: 14px;
+                font-weight: bold;
+                padding: 8px 16px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['info']}cc;
+            }}
+            QPushButton:pressed {{
+                background-color: {COLORS['info']}99;
+            }}
+        """)
 
     def format_packets_display(self):
         if self.total_packets == 0:
@@ -260,6 +396,10 @@ class SimplePage(QWidget):
         self.risk_level = self.db_manager.calculate_risk_level()
 
     def refresh_dashboard(self):
+        # Ne mettre à jour que si le système est en cours d'exécution
+        if not self.is_running:
+            return
+
         try:
             old_total = self.attack_stats['total_attacks']
             self.update_data_from_db()
@@ -290,7 +430,7 @@ class SimplePage(QWidget):
 
             hist_data = self.db_manager.get_attacks_last_24h()
             self.histogram.update_histogram(hist_data)
-            print("TOTAL:", self.attack_stats['total_attacks'])
+            print("📊 Mise à jour dashboard - Total attaques:", self.attack_stats['total_attacks'])
 
         except Exception as e:
             print(f"❌ Erreur mise à jour: {e}")
@@ -309,6 +449,7 @@ class SimplePage(QWidget):
                 background-color: {COLORS['bg_dark']};
                 border-radius: 20px;
                 padding: 15px;
+                border: 1px solid {COLORS['accent']};
             }}
         """)
 
@@ -327,11 +468,12 @@ class SimplePage(QWidget):
         layout.addWidget(title)
 
         content = QLabel(content_text)
-        content.setStyleSheet("""
+        content.setStyleSheet(f"""
             color: white;
             font-size: 18px;
             font-weight: bold;
             padding: 20px;
+            background-color: {COLORS['bg_dark']};
         """)
         content.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(content)
@@ -340,9 +482,17 @@ class SimplePage(QWidget):
         return frame
 
     def closeEvent(self, event):
+        """Fermeture propre de l'application"""
+        # Arrêter Snort si encore en cours d'exécution
+        if self.is_running:
+            self.snort.stop_snort()
+
+        # Fermer la connexion à la base de données
         if hasattr(self, 'db_manager') and self.db_manager.connection:
             self.db_manager.close_connection()
+
         event.accept()
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

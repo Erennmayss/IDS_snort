@@ -11,7 +11,7 @@ class SnortManager:
             cmd = [
                 "sudo", "-n", "snort",
                 "-A", "fast",
-                "-i", "ens33",
+                "-i", "en0s3",
                 "-c", "/etc/snort/snort.conf",
                 "-l", "/var/log/snort"
             ]

@@ -23,7 +23,7 @@ from matplotlib.figure import Figure
 from config import COLORS
 from gui.components import AnimatedLabel, FocusableFrame
 from data.dashboard import DatabaseManager
-from snort_module.lancement import SnortManager, start_snort, stop_snort  # ✅ Import du SnortManager
+from snort_module.lancement import SnortManager, start_snort, stop_snort, get_packet_count
 
 
 class TrafficHistogram(FigureCanvas):
@@ -95,12 +95,12 @@ class SimplePage(QWidget):
     def __init__(self):
         super().__init__()
         self.db_manager = DatabaseManager()
-        self.snort = SnortManager()  # ✅ Initialisation de SnortManager
+        self.snort = SnortManager()
         self.attack_stats = {'total_attacks': 0, 'last_hour_attacks': 0, 'severity_counts': {}}
         self.total_packets = 0
         self.risk_level = 0
-        self.is_running = False  # ✅ Ajout de is_running (état du système)
-        self.snort_running = False  # ✅ État de Snort
+        self.is_running = False
+        self.snort_running = False
 
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
@@ -157,7 +157,7 @@ class SimplePage(QWidget):
                 background-color: {COLORS['info']}99;
             }}
         """)
-        self.start_stop_btn.clicked.connect(self.toggle_system)  # ✅ Connexion du signal
+        self.start_stop_btn.clicked.connect(self.toggle_system)
         header_layout.addWidget(self.start_stop_btn)
 
         main_layout.addLayout(header_layout)
@@ -260,7 +260,6 @@ class SimplePage(QWidget):
         # Timer de mise à jour
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.refresh_dashboard)
-        # ⚡ NE PAS démarrer le timer automatiquement
 
     def toggle_system(self):
         """Active ou désactive Snort"""
@@ -271,7 +270,6 @@ class SimplePage(QWidget):
             self.start_stop_btn.setEnabled(False)
             self.update_timer.stop()
 
-            # Utiliser QTimer pour ne pas bloquer
             QTimer.singleShot(100, self._do_stop_snort)
         else:
             # Démarrer Snort
@@ -379,6 +377,15 @@ class SimplePage(QWidget):
         """)
 
     def format_packets_display(self):
+        """Affiche le nombre de paquets (priorité sur Snort)"""
+        # ✅ Récupérer le compteur depuis Snort
+        if hasattr(self, 'snort') and self.snort and self.snort_running:
+            snort_packets = self.snort.get_packet_count()
+            if snort_packets > 0:
+                nombre = f"{snort_packets:,}".replace(",", " ")
+                return f"{nombre}\nPAQUETS ANALYSÉS"
+
+        # Fallback sur la base de données
         if self.total_packets == 0:
             return "0 PAQUET\nAucune activité détectée"
         nombre = f"{self.total_packets:,}".replace(",", " ")
@@ -425,6 +432,12 @@ class SimplePage(QWidget):
             old_total = self.attack_stats['total_attacks']
             self.update_data_from_db()
 
+            # ✅ Mettre à jour l'affichage des paquets avec les données Snort
+            if hasattr(self, 'snort') and self.snort and self.snort_running:
+                snort_packets = self.snort.get_packet_count()
+                if snort_packets > 0:
+                    self.total_packets = snort_packets
+
             self.update_frame_content(self.cadre1, self.format_packets_display())
 
             new_attacks = self.attack_stats['total_attacks']
@@ -452,7 +465,8 @@ class SimplePage(QWidget):
             hist_data = self.db_manager.get_attacks_last_24h()
             self.histogram.update_histogram(hist_data)
 
-            print("📊 Dashboard updated:", new_attacks)
+            print(
+                f"📊 Dashboard updated - Attaques: {new_attacks} | Paquets Snort: {self.snort.get_packet_count() if self.snort else 0}")
 
         except Exception as e:
             print(f"❌ Erreur mise à jour: {e}")
@@ -507,15 +521,13 @@ class SimplePage(QWidget):
         """Fermeture propre de l'application - arrête Snort avant de quitter"""
         print("🛑 Fermeture de l'application...")
 
-        # Arrêter Snort si encore en cours
         if hasattr(self, 'snort') and self.snort and self.is_running:
             self.snort.stop_snort()
 
-        # Fermer la connexion à la base de données
         if hasattr(self, 'db_manager') and self.db_manager.connection:
             self.db_manager.close_connection()
 
-        event.accept()  # ← Accepte la fermeture (l'application se ferme)
+        event.accept()
 
 
 if __name__ == "__main__":

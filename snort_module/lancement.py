@@ -22,6 +22,7 @@ class SnortManager:
         self.db_connection = None
         self.db_cursor = None
         self.db_insert_count = 0
+        self.packet_count = 0  # ✅ Compteur de paquets
 
         os.makedirs(log_dir, exist_ok=True)
 
@@ -175,10 +176,37 @@ class SnortManager:
             thread = threading.Thread(target=self._tail_alerts, daemon=True)
             thread.start()
 
+            # ✅ Thread pour les statistiques paquets
+            stats_thread = threading.Thread(target=self._update_packet_stats, daemon=True)
+            stats_thread.start()
+
             return True
         except Exception as e:
             print(f"❌ Erreur: {e}")
             return False
+
+    def _update_packet_stats(self):
+        """Met à jour le compteur de paquets depuis l'interface réseau"""
+        last_rx_packets = 0
+        while self.snort_running:
+            try:
+                with open(f"/sys/class/net/{self.interface}/statistics/rx_packets", 'r') as f:
+                    current_rx = int(f.read().strip())
+
+                diff = current_rx - last_rx_packets
+                if diff > 0:
+                    self.packet_count += diff
+
+                last_rx_packets = current_rx
+
+            except Exception as e:
+                pass
+
+            time.sleep(5)
+
+    def get_packet_count(self):
+        """Retourne le nombre total de paquets analysés"""
+        return self.packet_count
 
     def _tail_alerts(self):
         time.sleep(2)
@@ -213,9 +241,6 @@ class SnortManager:
             else:
                 time.sleep(1)
 
-    # ============================================================
-    # ⚡ SEULE MODIFICATION : L'ARRÊT (rapide et non-bloquant)
-    # ============================================================
     def stop_snort(self):
         """Arrête Snort - rapide, non-bloquant, ne ferme pas l'app"""
         try:
@@ -230,6 +255,7 @@ class SnortManager:
         self.snort_running = False
         self.snort_process = None
         print("\n🛑 Snort arrêté")
+        print(f"📊 Total paquets analysés: {self.packet_count}")
 
     def is_running(self):
         return self.snort_running
@@ -250,6 +276,14 @@ def stop_snort():
     if _snort_manager:
         _snort_manager.stop_snort()
         _snort_manager = None
+
+
+def get_packet_count():
+    """Fonction externe pour récupérer le nombre de paquets"""
+    global _snort_manager
+    if _snort_manager:
+        return _snort_manager.get_packet_count()
+    return 0
 
 
 if __name__ == "__main__":

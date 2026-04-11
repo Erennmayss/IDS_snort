@@ -387,12 +387,23 @@ def start_snort(interface="enp0s3"):
     return _snort_manager.start_snort()
 
 
-def stop_snort():
-    global _snort_manager
-    if _snort_manager:
-        _snort_manager.stop_snort()
-        _snort_manager = None
+def stop_snort(self):
+    """Arrête Snort"""
+    try:
+        # Tuer FORCEMENT tous les processus Snort
+        subprocess.run(["sudo", "pkill", "-9", "-f", "snort"], capture_output=True)
 
+        if self.snort_process:
+            try:
+                self.snort_process.kill()
+            except:
+                pass
+
+        self.snort_running = False
+        print("🛑 Snort arrêté")
+    except Exception as e:
+        print(f"❌ Erreur arrêt: {e}")
+        self.snort_running = False
 
 if __name__ == "__main__":
     def signal_handler(sig, frame):

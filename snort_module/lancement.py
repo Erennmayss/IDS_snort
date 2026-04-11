@@ -66,6 +66,29 @@ class SnortManager:
                 pass
             return self.init_database()
 
+    def convert_timestamp(self, timestamp_str):
+        """Convertit le timestamp Snort en format PostgreSQL"""
+        try:
+            # Format Snort: 04/11-16:11:28.486252
+            # Convertir en: 2026-04-11 16:11:28.486252
+
+            # Séparer la date et l'heure
+            date_part, time_part = timestamp_str.split('-')
+
+            # Extraire mois et jour
+            month, day = date_part.split('/')
+
+            # Ajouter l'année courante
+            year = datetime.now().year
+
+            # Construire le timestamp PostgreSQL
+            pg_timestamp = f"{year}-{month}-{day} {time_part}"
+
+            return pg_timestamp
+        except Exception as e:
+            print(f"⚠️ Erreur conversion timestamp: {e}")
+            return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
     def get_network_metrics(self):
         """Récupère les métriques réseau (loss, traffic, services)"""
         loss_rate = "0"
@@ -157,7 +180,8 @@ class SnortManager:
         loss_rate, traffic, services = self.get_network_metrics()
 
         return {
-            'timestamp': timestamp,
+            'timestamp_raw': timestamp,
+            'timestamp': self.convert_timestamp(timestamp),
             'sid': sid,
             'src_ip': src_ip,
             'dst_ip': dst_ip,
@@ -217,7 +241,7 @@ class SnortManager:
 
         except Exception as e:
             print(f"   ❌ Erreur insertion DB: {e}")
-            # 🔥 CRUCIAL: Annuler la transaction pour pouvoir continuer
+            # Annuler la transaction pour pouvoir continuer
             try:
                 self.db_connection.rollback()
             except Exception as rollback_err:
@@ -302,7 +326,7 @@ class SnortManager:
         print(f"\n\033[91m{'=' * 80}\033[0m")
         print(f"\033[91m🚨 ALERTE #{self.alert_count}\033[0m")
         print(f"\033[91m{'=' * 80}\033[0m")
-        print(f"📅 Timestamp: {alert['timestamp']}")
+        print(f"📅 Timestamp: {alert['timestamp_raw']}")
         print(f"🆔 SID: {alert['sid']}")
         print(f"📍 Source: {alert['src_ip']}:{alert['src_port']}")
         print(f"🎯 Destination: {alert['dst_ip']}:{alert['dst_port']}")

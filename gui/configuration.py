@@ -123,6 +123,42 @@ class InterfaceParametresIDS(QMainWindow):
             os.makedirs(self.snort_rules_dir, exist_ok=True)
             print(f"📁 Utilisation du dossier alternatif: {self.snort_rules_dir}")
 
+    def show_custom_messagebox(self, title, message, icon=QMessageBox.Icon.Information,
+                               buttons=QMessageBox.StandardButton.Ok):
+        """Affiche une boîte de dialogue personnalisée avec texte blanc"""
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle(title)
+        msg_box.setText(message)
+        msg_box.setIcon(icon)
+        msg_box.setStandardButtons(buttons)
+
+        # Style pour texte blanc
+        msg_box.setStyleSheet("""
+            QMessageBox {
+                background-color: #1E293B;
+                color: white;
+            }
+            QMessageBox QLabel {
+                color: white;
+                font-size: 12px;
+                font-family: 'Segoe UI', monospace;
+            }
+            QPushButton {
+                background-color: #334155;
+                color: white;
+                border: 1px solid #475569;
+                border-radius: 5px;
+                padding: 6px 12px;
+                min-width: 80px;
+                font-family: 'Segoe UI', monospace;
+            }
+            QPushButton:hover {
+                background-color: #475569;
+            }
+        """)
+
+        return msg_box.exec()
+
     def initUI(self):
         screen = QApplication.primaryScreen()
         size = screen.size()
@@ -150,7 +186,7 @@ class InterfaceParametresIDS(QMainWindow):
         header_layout.addWidget(self.status_label)
         main_layout.addLayout(header_layout)
 
-        # Onglets stylisés (✅ Suppression de "Seuils" et "Sécurité Réseau")
+        # Onglets stylisés
         tabs = QTabWidget()
         tabs.setStyleSheet(f"""
             QTabWidget::pane {{ border: 1px solid {COLORS['accent']}; border-radius: 8px; background-color: {COLORS['bg_dark']}; }}
@@ -159,9 +195,7 @@ class InterfaceParametresIDS(QMainWindow):
         """)
 
         tabs.addTab(self.create_general_tab(), "⚙️ Général")
-        # tabs.addTab(self.create_seuils_tab(), "📊 Seuils")  ← SUPPRIMÉ
         tabs.addTab(self.create_regles_tab(), "📋 Règles")
-        # tabs.addTab(self.create_securite_tab(), "🛡️ Sécurité Réseau")  ← SUPPRIMÉ
         tabs.addTab(self.create_snort_tab(), "🐍 Export Snort")
 
         main_layout.addWidget(tabs)
@@ -306,28 +340,32 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET 80 (msg:"Trafic HTTP détecté"; flow:t
             self.verifier_include_snort_conf()
 
             self.status_bar.setText(f"✅ Règles exportées avec succès vers {self.snort_custom_rules_file}")
-            QMessageBox.information(
-                self,
+            self.show_custom_messagebox(
                 "✅ Export réussi",
                 f"Les règles ont été exportées vers:\n{self.snort_custom_rules_file}\n\n"
                 f"Redémarrez Snort pour appliquer les modifications:\n"
-                f"sudo systemctl restart snort\nou\nsudo pkill -f snort"
+                f"sudo systemctl restart snort\nou\nsudo pkill -f snort",
+                QMessageBox.Icon.Information
             )
 
         except PermissionError:
             # Fallback: proposer d'exporter avec sudo
-            reply = QMessageBox.question(
-                self,
+            reply = self.show_custom_messagebox(
                 "Permission refusée",
                 f"Permission refusée pour écrire dans {self.snort_custom_rules_file}\n\n"
                 "Voulez-vous exporter vers un fichier local ?",
+                QMessageBox.Icon.Question,
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
             if reply == QMessageBox.StandardButton.Yes:
                 self.exporter_regles_fichier()
 
         except Exception as e:
-            QMessageBox.critical(self, "❌ Erreur", f"Erreur lors de l'export:\n{str(e)}")
+            self.show_custom_messagebox(
+                "❌ Erreur",
+                f"Erreur lors de l'export:\n{str(e)}",
+                QMessageBox.Icon.Critical
+            )
             self.status_bar.setText(f"❌ Erreur: {str(e)}")
 
     def exporter_regles_fichier(self):
@@ -350,10 +388,18 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET 80 (msg:"Trafic HTTP détecté"; flow:t
                 with open(path, 'w') as f:
                     f.write(content)
                 self.status_bar.setText(f"✅ Règles sauvegardées: {path}")
-                QMessageBox.information(self, "✅ Succès", f"Fichier sauvegardé:\n{path}")
+                self.show_custom_messagebox(
+                    "✅ Succès",
+                    f"Fichier sauvegardé:\n{path}",
+                    QMessageBox.Icon.Information
+                )
 
         except Exception as e:
-            QMessageBox.critical(self, "❌ Erreur", f"Erreur lors de la sauvegarde:\n{str(e)}")
+            self.show_custom_messagebox(
+                "❌ Erreur",
+                f"Erreur lors de la sauvegarde:\n{str(e)}",
+                QMessageBox.Icon.Critical
+            )
 
     def verifier_include_snort_conf(self):
         """Vérifie et ajoute l'include des règles personnalisées dans snort.conf"""
@@ -463,7 +509,7 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET 80 (msg:"Trafic HTTP détecté"; flow:t
         self.table_regles.itemDoubleClicked.connect(self.charger_regle_pour_modification)
         return widget
 
-    # --- LOGIQUE EXISTANTE (sans Seuils et Sécurité Réseau) ---
+    # --- LOGIQUE EXISTANTE ---
     def toggle_ids(self, etat):
         status = "ACTIF" if etat else "INACTIF"
         self.status_label.setText(f"● STATUT: {status}")
@@ -507,11 +553,20 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET 80 (msg:"Trafic HTTP détecté"; flow:t
     def appliquer_configuration(self):
         """Applique la configuration et exporte les règles"""
         self.exporter_regles_snort()
-        QMessageBox.information(self, "Succès", "✅ Configuration appliquée et règles exportées vers Snort.")
+        self.show_custom_messagebox(
+            "Succès",
+            "✅ Configuration appliquée et règles exportées vers Snort.",
+            QMessageBox.Icon.Information
+        )
 
     def reset_configuration(self):
-        if QMessageBox.question(self, "Confirmer",
-                                "Réinitialiser la BDD des règles ?") == QMessageBox.StandardButton.Yes:
+        reply = self.show_custom_messagebox(
+            "Confirmer",
+            "Réinitialiser la BDD des règles ?",
+            QMessageBox.Icon.Question,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
             reset_db()
             self.load_rules()
 
@@ -521,7 +576,11 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET 80 (msg:"Trafic HTTP détecté"; flow:t
         if path:
             with open(path, 'w') as f:
                 json.dump(config, f)
-            QMessageBox.information(self, "Ok", "Fichier config généré.")
+            self.show_custom_messagebox(
+                "Ok",
+                "Fichier config généré.",
+                QMessageBox.Icon.Information
+            )
 
     def charger_configuration_auto(self):
         self.status_bar.setText("✓ Configuration temps-réel synchronisée")

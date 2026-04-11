@@ -442,7 +442,7 @@ class TrafficAnalyzerInterface(QMainWindow):
             return get_packet_count()
         except ImportError:
             try:
-                from lancement import get_packet_count
+                from snort_module.lancement import get_packet_count
                 return get_packet_count()
             except:
                 pass

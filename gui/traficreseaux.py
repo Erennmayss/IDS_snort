@@ -12,17 +12,17 @@ import time
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# === DÉFINITION DES COULEURS (du deuxième code) ===
+# === DÉFINITION DES COULEURS ===
 COLORS = {
-    'bg_dark': '#0F172A',  # Fond principal très sombre
-    'bg_medium': '#1E293B',  # Fond secondaire
-    'accent': '#334155',  # Bordures/accent
-    'text': '#94A3B8',  # Texte secondaire
-    'text_bright': '#F1F5F9',  # Texte principal clair
-    'info': '#0EA5E9',  # Bleu info (TCP, liens)
-    'success': '#10B981',  # Vert succès (UDP, positif)
-    'warning': '#F59E0B',  # Orange warning (ICMP, attention)
-    'danger': '#EF4444'  # Rouge danger (erreurs)
+    'bg_dark': '#0F172A',
+    'bg_medium': '#1E293B',
+    'accent': '#334155',
+    'text': '#94A3B8',
+    'text_bright': '#F1F5F9',
+    'info': '#0EA5E9',
+    'success': '#10B981',
+    'warning': '#F59E0B',
+    'danger': '#EF4444'
 }
 
 
@@ -44,11 +44,9 @@ class DatabaseManager:
         self.connect()
 
     def connect(self):
-        """Établit la connexion avec gestion des erreurs"""
         try:
             if self.connection and not self.connection.closed:
                 return True
-
             self.connection = psycopg2.connect(**self.db_config)
             self.connection.autocommit = True
             self.reconnect_attempts = 0
@@ -58,7 +56,6 @@ class DatabaseManager:
             logger.error(f"Erreur DB: {e}")
             self.connection = None
             self.reconnect_attempts += 1
-
             if self.reconnect_attempts > 3:
                 logger.warning("Trop de tentatives, pause de 5 secondes...")
                 time.sleep(5)
@@ -66,7 +63,6 @@ class DatabaseManager:
             return False
 
     def ensure_connection(self):
-        """Vérifie et rétablit la connexion si nécessaire"""
         if not self.connection or self.connection.closed:
             return self.connect()
         try:
@@ -77,7 +73,6 @@ class DatabaseManager:
             return self.connect()
 
     def parse_rx_tx(self, volume_str):
-        """Parse le volume et retourne (rx, tx) en MB"""
         if not volume_str:
             return 0, 0
         try:
@@ -86,8 +81,7 @@ class DatabaseManager:
             rx = float(rx_match.group(1)) if rx_match else 0
             tx = float(tx_match.group(1)) if tx_match else 0
             return rx, tx
-        except Exception as e:
-            logger.error(f"Erreur parsing volume '{volume_str}': {e}")
+        except:
             return 0, 0
 
     def parse_volume(self, volume_str):
@@ -171,14 +165,11 @@ class DatabaseManager:
                     total_rx_mb += rx
                     total_tx_mb += tx
 
-                logger.info(f"SOMME TOTALE - RX: {total_rx_mb} MB, TX: {total_tx_mb} MB")
-
                 cursor.execute("SELECT loss FROM alertes WHERE loss IS NOT NULL AND loss != ''")
                 loss_records = cursor.fetchall()
 
                 total_loss_sum = sum(self.parse_loss(r['loss']) for r in loss_records)
                 total_loss_count = len(loss_records)
-
                 avg_loss = (total_loss_sum / total_loss_count) if total_loss_count > 0 else 0
 
                 LATENCY_FACTOR = 10
@@ -427,13 +418,13 @@ class TrafficAnalyzerInterface(QMainWindow):
         self.setGeometry(0, 0, screen.width(), screen.height() - 80)
         self.setFixedSize(screen.width(), screen.height() - 80)
 
-        # Application du fond sombre
         self.setAutoFillBackground(True)
         palette = self.palette()
         palette.setColor(QPalette.ColorRole.Window, QColor(COLORS['bg_dark']))
         self.setPalette(palette)
 
         self.db_manager = DatabaseManager()
+        self.total_packets = 0  # ✅ Compteur total de paquets
         self.setup_style()
         self.init_ui()
 
@@ -443,6 +434,21 @@ class TrafficAnalyzerInterface(QMainWindow):
 
         self.last_ui_state = {}
         self.is_closing = False
+
+    def get_total_packets_from_snort(self):
+        """Récupère le nombre total de paquets depuis SnortManager"""
+        try:
+            from snort_module.lancement import get_packet_count
+            return get_packet_count()
+        except ImportError:
+            try:
+                from lancement import get_packet_count
+                return get_packet_count()
+            except:
+                pass
+        except Exception as e:
+            logger.error(f"Erreur récupération paquets: {e}")
+        return self.total_packets
 
     def show_service_details(self, item):
         if item is None:
@@ -737,20 +743,22 @@ class TrafficAnalyzerInterface(QMainWindow):
         volume_group.setLayout(volume_layout)
         chart_layout.addWidget(volume_group)
 
-        pps_group = QGroupBox(" Paquets/s")
+        # ✅ Groupe modifié : maintenant affiche le TOTAL des paquets (pas paquets/s)
+        pps_group = QGroupBox(" Total paquets")
         pps_layout = QVBoxLayout()
         self.pps_label = QLabel("0")
         self.pps_label.setObjectName("value_label")
         self.pps_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.pps_label.setStyleSheet(f"font-size: 24px; color: {COLORS['info']};")
+        self.pps_label.setStyleSheet(f"font-size: 24px; color: {COLORS['success']};")
         pps_layout.addWidget(self.pps_label)
-        pps_trend = QLabel("Données en temps réel")
+        pps_trend = QLabel("Depuis le démarrage")
         pps_trend.setObjectName("stat_label")
         pps_trend.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        pps_trend.setStyleSheet(f"color: {COLORS['success']};")
+        pps_trend.setStyleSheet(f"color: {COLORS['info']};")
         pps_layout.addWidget(pps_trend)
         pps_group.setLayout(pps_layout)
         chart_layout.addWidget(pps_group)
+
         layout.addLayout(chart_layout)
 
         ip_group = QGroupBox("Top 5 IP - Volume de données et Paquets")
@@ -936,9 +944,19 @@ class TrafficAnalyzerInterface(QMainWindow):
             if self._should_update_ui('total_volume', total_vol_str):
                 self.total_volume_label.setText(total_vol_str)
 
-            pps_str = f"{stats['packets_per_second']:.0f}"
-            if self._should_update_ui('pps', pps_str):
-                self.pps_label.setText(pps_str)
+            # ✅ Mise à jour du nombre TOTAL de paquets (pas paquets/s)
+            total_packets = self.get_total_packets_from_snort()
+            if total_packets > 0:
+                self.total_packets = total_packets
+                if total_packets >= 1_000_000:
+                    packets_str = f"{total_packets / 1_000_000:.1f}M"
+                elif total_packets >= 1_000:
+                    packets_str = f"{total_packets / 1_000:.1f}k"
+                else:
+                    packets_str = f"{total_packets:,}"
+
+                if self._should_update_ui('total_packets', packets_str):
+                    self.pps_label.setText(packets_str)
 
             self.update_ip_table()
             self.update_detailed_ip_table()
@@ -1007,7 +1025,6 @@ class TrafficAnalyzerInterface(QMainWindow):
                 self.tcp_ports_table.setRowCount(len(ports))
                 for row, p in enumerate(ports):
                     service = p['service_name'] if p['service_name'] else 'Inconnu'
-                    # Pas de setBackground - le style CSS gère le fond sombre
                     self.tcp_ports_table.setItem(row, 0, QTableWidgetItem(str(p['port'])))
                     self.tcp_ports_table.setItem(row, 1, QTableWidgetItem(service))
                     self.tcp_ports_table.setItem(row, 2, QTableWidgetItem(f"{p['connection_count']:,}"))
@@ -1030,7 +1047,6 @@ class TrafficAnalyzerInterface(QMainWindow):
                 self.udp_ports_table.setRowCount(len(ports))
                 for row, p in enumerate(ports):
                     service = p['service_name'] if p['service_name'] else 'Inconnu'
-                    # Pas de setBackground - le style CSS gère le fond sombre
                     self.udp_ports_table.setItem(row, 0, QTableWidgetItem(str(p['port'])))
                     self.udp_ports_table.setItem(row, 1, QTableWidgetItem(service))
                     self.udp_ports_table.setItem(row, 2, QTableWidgetItem(f"{p['datagram_count']:,}"))

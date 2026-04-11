@@ -150,7 +150,7 @@ class InterfaceParametresIDS(QMainWindow):
         header_layout.addWidget(self.status_label)
         main_layout.addLayout(header_layout)
 
-        # Onglets stylisés
+        # Onglets stylisés (✅ Suppression de "Seuils" et "Sécurité Réseau")
         tabs = QTabWidget()
         tabs.setStyleSheet(f"""
             QTabWidget::pane {{ border: 1px solid {COLORS['accent']}; border-radius: 8px; background-color: {COLORS['bg_dark']}; }}
@@ -159,9 +159,9 @@ class InterfaceParametresIDS(QMainWindow):
         """)
 
         tabs.addTab(self.create_general_tab(), "⚙️ Général")
-        tabs.addTab(self.create_seuils_tab(), "📊 Seuils")
+        # tabs.addTab(self.create_seuils_tab(), "📊 Seuils")  ← SUPPRIMÉ
         tabs.addTab(self.create_regles_tab(), "📋 Règles")
-        tabs.addTab(self.create_securite_tab(), "🛡️ Sécurité Réseau")
+        # tabs.addTab(self.create_securite_tab(), "🛡️ Sécurité Réseau")  ← SUPPRIMÉ
         tabs.addTab(self.create_snort_tab(), "🐍 Export Snort")
 
         main_layout.addWidget(tabs)
@@ -422,32 +422,6 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET 80 (msg:"Trafic HTTP détecté"; flow:t
         layout.addStretch()
         return widget
 
-    def create_seuils_tab(self):
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        group = self.create_styled_group("Seuils de Tolérance")
-        grid = QGridLayout()
-
-        labels = ["Max Paquets/s :", "Volume Max (MB/s) :", "Max Connexions :", "Tentatives Login :"]
-        self.spin_max_paquets = QSpinBox()
-        self.spin_volume_max = QSpinBox()
-        self.spin_max_connexions = QSpinBox()
-        self.spin_max_tentatives = QSpinBox()
-
-        spins = [self.spin_max_paquets, self.spin_volume_max, self.spin_max_connexions, self.spin_max_tentatives]
-        for i, text in enumerate(labels):
-            lbl = QLabel(text)
-            lbl.setStyleSheet("color: white;")
-            grid.addWidget(lbl, i, 0)
-            spins[i].setStyleSheet(INPUT_STYLE)
-            spins[i].setRange(1, 100000)
-            grid.addWidget(spins[i], i, 1)
-
-        group.setLayout(grid)
-        layout.addWidget(group)
-        layout.addStretch()
-        return widget
-
     def create_regles_tab(self):
         widget = QWidget()
         layout = QVBoxLayout(widget)
@@ -489,36 +463,7 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET 80 (msg:"Trafic HTTP détecté"; flow:t
         self.table_regles.itemDoubleClicked.connect(self.charger_regle_pour_modification)
         return widget
 
-    def create_securite_tab(self):
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-
-        group = self.create_styled_group("Blacklist IP")
-        vbox = QVBoxLayout()
-        self.blacklist = QListWidget()
-        self.blacklist.setStyleSheet(INPUT_STYLE)
-        vbox.addWidget(self.blacklist)
-
-        self.edit_nouvelle_ip = QLineEdit()
-        self.edit_nouvelle_ip.setStyleSheet(INPUT_STYLE)
-        self.edit_nouvelle_ip.setPlaceholderText("Ajouter une IP (ex: 192.168.1.100)")
-        vbox.addWidget(self.edit_nouvelle_ip)
-
-        btn_lay = QHBoxLayout()
-        self.btn_blacklist_ajouter = QPushButton("Ajouter")
-        self.btn_blacklist_supprimer = QPushButton("Supprimer")
-        for b in [self.btn_blacklist_ajouter, self.btn_blacklist_supprimer]:
-            b.setStyleSheet(BTN_PRIMARY_STYLE.replace("#0EA5E9", "#334155"))
-            btn_lay.addWidget(b)
-        vbox.addLayout(btn_lay)
-        group.setLayout(vbox)
-
-        layout.addWidget(group)
-        self.btn_blacklist_ajouter.clicked.connect(lambda: self.ajouter_ip("blacklist"))
-        self.btn_blacklist_supprimer.clicked.connect(lambda: self.supprimer_ip("blacklist"))
-        return widget
-
-    # --- LOGIQUE EXISTANTE ---
+    # --- LOGIQUE EXISTANTE (sans Seuils et Sécurité Réseau) ---
     def toggle_ids(self, etat):
         status = "ACTIF" if etat else "INACTIF"
         self.status_label.setText(f"● STATUT: {status}")
@@ -559,20 +504,8 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET 80 (msg:"Trafic HTTP détecté"; flow:t
             supprimer_regle(self.sid)
             self.load_rules()
 
-    def ajouter_ip(self, t):
-        ip = self.edit_nouvelle_ip.text().strip()
-        if ip:
-            self.blacklist.addItem(ip)
-            self.edit_nouvelle_ip.clear()
-
-    def supprimer_ip(self, t):
-        current = self.blacklist.currentItem()
-        if current:
-            self.blacklist.takeItem(self.blacklist.row(current))
-
     def appliquer_configuration(self):
         """Applique la configuration et exporte les règles"""
-        # Ici vous pouvez ajouter d'autres actions de configuration
         self.exporter_regles_snort()
         QMessageBox.information(self, "Succès", "✅ Configuration appliquée et règles exportées vers Snort.")
 
